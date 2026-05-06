@@ -163,7 +163,7 @@ For better security:
 
 ## 👨‍💻 Author
 
-Developed by **Rian Viloria**
+Developed by **CrabLens Team**
 
 ---
 
