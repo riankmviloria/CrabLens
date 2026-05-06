@@ -217,7 +217,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> {
-  final String _apiKey = "AIzaSyDi0OtnsUEVB37kmyCntWCj4v3-y1z-aOE";
+  final String _apiKey = "USE_YOUR_GOOGLE_VISION_API_KEY";
   late String _currentFact;
   List<String> _recentImages = [];
 
