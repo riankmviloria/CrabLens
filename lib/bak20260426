@@ -1,0 +1,715 @@
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
+
+// --- FIGMA COLOR PALETTE ---
+const Color kPrimaryRed = Color(0xFFD32F2F);
+const Color kDarkText = Color(0xFF212121);
+const Color kAccentBlue = Color(0xFF607D8B);
+const Color kBgGray = Color(0xFFF5F5F5);
+
+// --- 1. SPECIES DATABASE ---
+final Map<String, Map<String, String>> crabDatabase = {
+  "Platypodia granulosa": {
+    "common": "Xanthid Crab",
+    "scientific": "Platypodia granulosa",
+    "local": "Reef Crab",
+    "description": "A small, fan-shaped crab with a shell covered in tiny, sand-like bumps (granules). Usually reddish-brown or orange.",
+    "habitat": "Shallow coral reefs and rocky crevices.",
+    "characteristics": "Features 'crested' legs with very thin, blade-like edges. Part of the toxic Xanthidae family.",
+    "edibility": "DEADLY POISONOUS - DO NOT EAT",
+    "risk": "EXTREME NEUROTOXICITY (Contains Saxitoxin).",
+    "handling": "DO NOT TOUCH. Toxins are heat-stable and cannot be neutralized by cooking or boiling.",
+    "firstAid": "INGESTION EMERGENCY: Rush to the hospital immediately for respiratory support.",
+  },
+  "Atergatis floridus": {
+    "common": "Floral Egg Crab (Shawl Crab)",
+    "scientific": "Atergatis floridus",
+    "local": "Liod / Kaligmata",
+    "description": "Smooth, oval-shaped carapace, typically greenish-brown with a beautiful lace-like or 'floral' white pattern.",
+    "habitat": "Shallow coral reefs and rocky shorelines throughout the Philippines.",
+    "characteristics": "The shell is very smooth to the touch, resembling an egg. It is slow-moving and often found hiding under rocks.",
+    "edibility": "DEADLY POISONOUS - DO NOT EAT",
+    "risk": "EXTREME NEUROTOXICITY (Tetrodotoxin & Saxitoxin)",
+    "handling": "DO NOT TOUCH. Toxins are present in the flesh and skin mucus.",
+    "firstAid": "INGESTION EMERGENCY. Rush to the hospital for life support (ventilator). No known antidote exists.",
+    "seasonality": "Year-round in reef environments."
+  },
+  "Zosimus aeneus": {
+    "common": "Toxic Reef Crab (Devil crab | Killer Crab)",
+    "scientific": "Zosimus aeneus",
+    "description": "A brownish crab covered in prominent chocolate-brown or reddish-brown blotches separated by pale lines. Its shell is bumpy and 'lumpy' in texture.",
+    "habitat": "Found in shallow coral reefs and rocky crevices across the Indo-Pacific and the Philippines.",
+    "characteristics": "Distinctive 'lumpy' carapace. Unlike edible crabs, it is slow-moving and does not hide as aggressively.",
+    "edibility": "DEADLY POISONOUS (Never Ingest)",
+    "risk": "EXTREME - Contains high concentrations of neurotoxins (Saxitoxin and Tetrodotoxin).",
+    "handling": "DO NOT TOUCH. Toxins can be absorbed through skin breaks or mucus membranes.",
+    "firstAid": "INGESTION IS A MEDICAL EMERGENCY. Induce vomiting and RUSH to a hospital for mechanical ventilation. There is no antidote.",
+    "seasonality": "Year-round in reef environments."
+  },
+  "Scylla serrata": {
+    "common": "Giant Mud Crab (Alimango)",
+    "description": "Large, dark green to black crab with massive, powerful claws.",
+    "habitat": "Mangrove swamps, estuaries, and muddy soft bottoms.",
+    "characteristics": "9 sharp teeth on each side of the shell; extremely strong crushing claws.",
+    "edibility": "Highly Edible (Premium Delicacy)",
+    "risk": "Low Toxicity / High Physical Risk (Pinching)",
+    "handling": "Extremely dangerous claws. Use tongs or secure with thick rope.",
+    "firstAid": "Clean with antiseptic, apply pressure, seek stitches if deep.",
+    "seasonality": "Available year-round; peak July-Oct."
+  },
+  "Portunus pelagicus": {
+    "common": "Blue Swimming Crab (Alimasag)",
+    "description": "Mottled blue/purple (males) or sandy brown (females) with white spots.",
+    "habitat": "Shallow sandy coastal waters and seagrass beds.",
+    "characteristics": "Long, slender pincers; back legs are paddles for swimming.",
+    "edibility": "Highly Edible (Sweet meat)",
+    "risk": "Non-toxic",
+    "handling": "Fast and aggressive. Pick up from the very back.",
+    "firstAid": "Standard antiseptic care for minor cuts.",
+    "seasonality": "Best during dry summer months (March-May)."
+  },
+  "Lophozozymus pictor": {
+    "common": "Mosaic Reef Crab (Calintugas)",
+    "local": "Calintugas",
+    "description": "A strikingly beautiful crab with a red and white 'mosaic' pattern.",
+    "habitat": "Coral reefs and rocky shores; Indo-Pacific/Philippines.",
+    "characteristics": "Smooth, fan-shaped carapace with distinct red/orange patches.",
+    "edibility": "DEADLY POISONOUS (Never Ingest)",
+    "risk": "EXTREME - Contains heat-resistant neurotoxins.",
+    "handling": "DO NOT TOUCH. Do not cook or eat.",
+    "firstAid": "If ingested: RUSH to the hospital immediately.",
+    "seasonality": "Year-round in reef environments."
+  },
+  "Hero Elayda": {
+    "common": "Hero Elayda",
+    "scientific": "He is ro Elay is da",
+    "description": "vaklita ng purok nwebe",
+    "habitat": "Subic to Santa Cruz",
+    "characteristics": "Ganda at sarap lang",
+    "edibility": "kain lahat",
+    "risk": "Low risk, high landian",
+    "handling": "Handle with care, baka mafall.",
+    "firstAid": "Give water or coffee."
+  }
+};
+
+void main() => runApp(const CrabLensApp());
+
+class CrabLensApp extends StatelessWidget {
+  const CrabLensApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'CrabLens AI',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primaryColor: kPrimaryRed,
+        colorScheme: ColorScheme.fromSeed(seedColor: kPrimaryRed),
+        useMaterial3: true,
+        scaffoldBackgroundColor: kBgGray,
+      ),
+      home: const SplashScreen(),
+    );
+  }
+}
+
+// --- 2. SPLASH SCREEN (Figma Style) ---
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search, size: 100, color: kPrimaryRed),
+            const SizedBox(height: 15),
+            const Text('CrabLens', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: kDarkText)),
+            const SizedBox(height: 30),
+            const CircularProgressIndicator(color: kPrimaryRed),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 3. LOGIN PAGE (Figma Style) ---
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF8B1A1A), // Darker Red from Figma
+      body: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Welcome', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 50),
+            TextField(
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
+                hintText: 'Email',
+                hintStyle: const TextStyle(color: Colors.white70),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              obscureText: true,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
+                hintText: 'Password',
+                hintStyle: const TextStyle(color: Colors.white70),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryRed,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardPage())),
+              child: const Text('Log In', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 4. MAIN DASHBOARD ---
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  int _currentIndex = 0;
+  final List<Widget> _pages = [const HomeScreen(), const HistoryScreen(), const ProfileScreen()];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('CrabLens', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: kPrimaryRed,
+        centerTitle: true,
+        elevation: 0,
+      ),
+      body: _pages[_currentIndex == 3 ? 0 : (_currentIndex == 4 ? 2 : _currentIndex)], 
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: kPrimaryRed,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Camera'),
+          BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
+}
+
+// --- 5. HOME SCREEN ---
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+  final String _apiKey = "AIzaSyDi0OtnsUEVB37kmyCntWCj4v3-y1z-aOE";
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Good Day!', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: kDarkText)),
+          const Text('Welcome to app for crab species classification.', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 25),
+          Row(
+            children: [
+              Expanded(child: _actionCard(context, "Capture Image", Icons.camera_alt, ImageSource.camera)),
+              const SizedBox(width: 15),
+              Expanded(child: _actionCard(context, "Upload Image", Icons.cloud_upload, ImageSource.gallery)),
+            ],
+          ),
+          const SizedBox(height: 30),
+          const Text('Recent Scans', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10),
+            itemCount: 4,
+            itemBuilder: (context, index) => Container(
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.image, color: Colors.grey, size: 50),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionCard(BuildContext context, String title, IconData icon, ImageSource source) {
+    return InkWell(
+      onTap: () => _handleImage(context, source),
+      child: Container(
+        height: 130,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: kPrimaryRed, size: 40),
+            const SizedBox(height: 10),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: kDarkText)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- IMAGE HANDLING ---
+  Future<void> _handleImage(BuildContext context, ImageSource source) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: source, maxWidth: 800);
+    if (image == null) return;
+
+    showDialog(context: context, builder: (_) => const Center(child: CircularProgressIndicator(color: kPrimaryRed)));
+
+    try {
+      final bytes = await File(image.path).readAsBytes();
+      final body = jsonEncode({
+        "requests": [{"image": {"content": base64Encode(bytes)}, "features": [{"type": "WEB_DETECTION"}, {"type": "LABEL_DETECTION"}]}]
+      });
+
+      final response = await http.post(Uri.parse('https://vision.googleapis.com/v1/images:annotate?key=$_apiKey'), body: body);
+      if (context.mounted) Navigator.pop(context);
+
+      if (response.statusCode == 200) {
+        
+        final data = jsonDecode(response.body);
+
+        // --- NEW: PRINT ALL LOGS WITHOUT TRUNCATION ---
+        String prettyJson = const JsonEncoder.withIndent('  ').convert(data);
+        debugPrint("========== FULL VISION API LOG ==========");
+        debugPrint(prettyJson); 
+        debugPrint("=========================================");
+
+        
+        final responses = data['responses'][0];
+        
+        // 1. Gather ALL text the AI found (Labels + Web Entities)
+        List labels = responses['labelDetection'] ?? [];
+        List entities = responses['webDetection']?['webEntities'] ?? [];
+        
+        String megaText = "";
+        print("--- INDIVIDUAL ENTITIES FOUND ---");
+        for (var l in labels) { 
+          String desc = l['description'] ?? "";
+          megaText += "$desc "; 
+          print("Label: $desc");
+        }
+        for (var e in entities) { 
+          String desc = e['description'] ?? "";
+          megaText += "$desc "; 
+          print("Web Entity: $desc (Score: ${e['score']})");
+        }
+        megaText = megaText.toLowerCase();
+
+        // 2. MANUAL OVERRIDE (The "Deep Search")
+        String detectedSpecies = "Unknown Crab";
+        String confidence = "N/A";
+
+        // if (megaText.contains("platypodia") || megaText.contains("granulosa")) {
+        //   detectedSpecies = "Platypodia granulosa";
+        //   confidence = "99% (Species Match)";
+        // } 
+        // else if (megaText.contains("floridus") || megaText.contains("atergatis")) {
+        //   detectedSpecies = "Atergatis floridus";
+        //   confidence = "99% (Species Match)";
+        // }
+        // else if (megaText.contains("zosimus") || megaText.contains("aeneus")) {
+        //   detectedSpecies = "Zosimus aeneus";
+        //   confidence = "99% (Species Match)";
+        // }
+        // else if (entities.isNotEmpty) {
+        //   detectedSpecies = entities[0]['description'] ?? "Unknown";
+        //   confidence = "${((entities[0]['score'] ?? 0.0) * 100).toStringAsFixed(1)}%";
+        // }
+
+         // 2. PRIORITY 2: Look for specific Toxic Species anywhere in the results
+         if (megaText.contains("floridus") || megaText.contains("floral egg")) {
+          detectedSpecies = "Atergatis floridus";
+          confidence = "Species Match";
+        }
+        else if (megaText.contains("platypodia") || megaText.contains("granulosa")) {
+          detectedSpecies = "Platypodia granulosa";
+          confidence = "Species Match";
+        }
+        else if (megaText.contains("zosimus") || megaText.contains("aeneus")) {
+          detectedSpecies = "Zosimus aeneus";
+          confidence = "Species Match";
+        }
+        // 3. PRIORITY 3: If no toxic match, take the highest scoring general name
+        else if (entities.isNotEmpty) {
+          detectedSpecies = entities[0]['description'] ?? "Unknown";
+          double rawScore = entities[0]['score'] ?? 0.0;
+          confidence = "${(rawScore * 100).toStringAsFixed(1)}%";
+        }
+         
+        //  if (entities.isNotEmpty) {
+        //   // Grab the #1 result automatically
+        //   detectedSpecies = entities[0]['description'] ?? "Unknown";
+        //   double rawScore = entities[0]['score'] ?? 0.0;
+        //   confidence = "${(rawScore * 100).toStringAsFixed(1)}%";
+        // }
+
+        // --- THE "DATABASE BRIDGE" ---
+        // This ensures "Floral egg crab" maps to your "Atergatis floridus" entry
+        String lookupKey = detectedSpecies.toLowerCase();
+        if (lookupKey.contains("floral") || lookupKey.contains("atergatis")) {
+           detectedSpecies = "Atergatis floridus";
+        } else if (lookupKey.contains("platypodia") || lookupKey.contains("granulosa")) {
+           detectedSpecies = "Platypodia granulosa";
+        } else if (lookupKey.contains("zosimus") || lookupKey.contains("aeneus")) {
+           detectedSpecies = "Zosimus aeneus";
+        }
+
+        // 3. Show Result
+        _showResult(context, image.path, detectedSpecies, confidence);
+      }
+      
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+    }
+  }
+
+  void _showResult(BuildContext context, String path, String species, String confidence) {
+  String correctedName = species;
+  String lowerSpecies = species.toLowerCase();
+
+  // 1. DEFINE THE DEADLY LIST
+  // This includes all the toxic reef/xanthid crabs we've added
+  bool isDeadly = false;
+
+  // --- EDIBLE & COMMON SPECIES MAPPING ---
+    
+    // 1. Map Dungeness/Mangrove/Alimango to Mud Crab
+    if (lowerSpecies.contains("dungeness") || 
+        lowerSpecies.contains("scylla") || 
+        lowerSpecies.contains("mud crab") || 
+        lowerSpecies.contains("mangrove")) {
+      correctedName = "Scylla serrata";
+      isDeadly = false; // Safe to eat
+    } 
+    
+    // 2. Map Blue Crab/Chesapeake to Blue Swimming Crab
+    else if (lowerSpecies.contains("blue crab") || 
+             lowerSpecies.contains("portunus") || 
+             lowerSpecies.contains("pelagicus")) {
+      correctedName = "Portunus pelagicus";
+      isDeadly = false; // Safe to eat
+    }
+
+    // --- THE TOXIC TRIO (Keep these as 'true') ---
+    else if (lowerSpecies.contains("zosimus") || lowerSpecies.contains("aeneus")) {
+      correctedName = "Zosimus aeneus";
+      isDeadly = true;
+    }
+    else if (lowerSpecies.contains("floridus") || lowerSpecies.contains("atergatis")) {
+      correctedName = "Atergatis floridus";
+      isDeadly = true;
+    }
+    else if (lowerSpecies.contains("granulosa") || lowerSpecies.contains("platypodia") || lowerSpecies.contains("xanthid") || lowerSpecies.contains("reef crab")) {
+      correctedName = "Platypodia granulosa";
+      isDeadly = true;
+    }
+  else if (lowerSpecies.contains("pictor") || lowerSpecies.contains("mosaic")) {
+    correctedName = "Lophozozymus pictor";
+    isDeadly = true;
+  }
+
+  // 2. TRIGGER VIBRATION FOR ALL DEADLY SPECIES
+  if (isDeadly) {
+    HapticFeedback.vibrate();
+    Future.delayed(const Duration(milliseconds: 400), () => HapticFeedback.vibrate());
+  }
+
+  // 3. UPDATED ALERT DIALOG
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      // Turn background RED if it's any of the deadly species
+      backgroundColor: isDeadly ? Colors.red.shade900 : Colors.white,
+      title: Text(
+        isDeadly ? "⚠️ TOXIC SPECIES DETECTED" : "AI Classification",
+        style: TextStyle(color: isDeadly ? Colors.white : Colors.black),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            correctedName, 
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.bold, 
+              fontSize: 22, 
+              color: isDeadly ? Colors.yellow : kPrimaryRed
+            )
+          ),
+          const SizedBox(height: 10),
+          if (isDeadly)
+            const Text(
+              "POISONOUS: DO NOT CONSUME",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context), 
+          child: Text("Close", style: TextStyle(color: isDeadly ? Colors.white70 : Colors.grey))
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDeadly ? Colors.yellow : kPrimaryRed,
+          ),
+          onPressed: () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => CrabDetailScreen(
+                speciesName: correctedName, 
+                imagePath: path, 
+                confidence: confidence
+              )
+            ));
+          },
+          child: Text(
+            "View Full Specs", 
+            style: TextStyle(color: isDeadly ? Colors.black : Colors.white)
+          ),
+        )
+      ],
+    ),
+  );
+}
+}
+
+// --- 6. DETAILS SCREEN (Figma Information Page) ---
+class CrabDetailScreen extends StatelessWidget {
+  final String speciesName, imagePath, confidence;
+  const CrabDetailScreen({super.key, required this.speciesName, required this.imagePath, required this.confidence});
+
+  @override
+  Widget build(BuildContext context) {
+    // 1. Database Lookup
+    final entry = crabDatabase.entries.firstWhere(
+      (e) => e.key == speciesName || speciesName.toLowerCase().contains(e.key.toLowerCase()),
+      orElse: () => MapEntry("Unknown", {
+        "common": speciesName,
+        "scientific": speciesName,
+        "description": "No data found.",
+        "habitat": "Unknown",
+        "characteristics": "Unknown",
+        "risk": "Unknown",
+        "handling": "Caution",
+        "firstAid": "Consult a professional."
+      }),
+    );
+
+    final info = entry.value;
+    final String dbKey = entry.key; // This is the Scientific Name (e.g., Scylla serrata)
+    
+    // 2. Name Extraction Logic
+    // Uses the "scientific" key if it exists, otherwise uses the DB key
+    String scientificHeader = info['scientific'] ?? dbKey;
+    
+    // Splits "Giant Mud Crab (Alimango)" into Common: Giant Mud Crab, Local: Alimango
+    String rawCommon = info['common'] ?? "Unknown";
+    String commonName = rawCommon;
+    String localName = "Not specified";
+    
+    if (rawCommon.contains('(')) {
+      commonName = rawCommon.split('(')[0].trim();
+      localName = rawCommon.split('(')[1].replaceAll(')', '').trim();
+    }
+
+    bool isPrank = speciesName == "Hero Elayda";
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Species Details"),
+        backgroundColor: Colors.white,
+        foregroundColor: kDarkText,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Section
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.file(File(imagePath), width: double.infinity, height: 220, fit: BoxFit.cover),
+            ),
+            const SizedBox(height: 25),
+
+            // --- SPECIES IDENTIFICATION HEADER ---
+            Text(
+              scientificHeader,
+              style: const TextStyle(
+                fontSize: 28, 
+                fontWeight: FontWeight.bold, 
+                fontStyle: FontStyle.italic, // Correct for Scientific Names
+                color: kPrimaryRed,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _idBadge("Common Name", commonName),
+            const SizedBox(height: 5),
+            _idBadge("Local Name", localName),
+            
+            const SizedBox(height: 10),
+            Text("AI Confidence: $confidence", 
+                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            
+            const Divider(height: 40),
+
+            // Detailed Information
+            _infoBlock(Icons.description, "Description", info['description']!),
+            _infoBlock(Icons.map, "Habitat", info['habitat']!),
+            _infoBlock(Icons.list_alt, "Characteristics", info['characteristics']!),
+            
+            // Safety Box
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isPrank ? Colors.purple.shade50 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isPrank ? Colors.purple : kPrimaryRed),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("🚨 SAFETY & HANDLING", 
+                    style: TextStyle(fontWeight: FontWeight.bold, color: isPrank ? Colors.purple : kPrimaryRed)),
+                  const SizedBox(height: 8),
+                  Text("Risk: ${info['risk']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text("Handling: ${info['handling']}"),
+                  Text("First Aid: ${info['firstAid']}"),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Small helper for Name rows
+  Widget _idBadge(String label, String value) {
+    return Row(
+      children: [
+        Text("$label: ", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _infoBlock(IconData icon, String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: kPrimaryRed, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(content, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
+}
+// --- PROFILE SCREEN (Figma Style) ---
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const CircleAvatar(radius: 55, backgroundColor: Colors.grey, child: Icon(Icons.person, size: 50, color: Colors.white)),
+          const SizedBox(height: 10),
+          const Text('Hello, Alex', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 30),
+          _profileTile(Icons.settings, "Account Management"),
+          _profileTile(Icons.tune, "App Preferences"),
+          _profileTile(Icons.info, "About CrabLens"),
+          _profileTile(Icons.logout, "Log Out", color: kPrimaryRed),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileTile(IconData icon, String label, {Color color = kDarkText}) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () {},
+    );
+  }
+}
+
+class HistoryScreen extends StatelessWidget {
+  const HistoryScreen({super.key});
+  @override
+  Widget build(BuildContext context) => const Center(child: Text("History List Placeholder"));
+}

@@ -1,0 +1,4 @@
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.google.api.client.json.** { *; }
+-keep class com.google.api.services.vision.** { *; }

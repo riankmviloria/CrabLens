@@ -1,0 +1,554 @@
+// AIzaSyDi0OtnsUEVB37kmyCntWCj4v3-y1z-aOE
+
+// import 'package:flutter/material.dart';
+// import 'package:image_picker/image_picker.dart';
+// import 'dart:io';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http; // Real API calls
+
+// void main() {
+//   runApp(const CrabLensApp());
+// }
+
+// class CrabLensApp extends StatelessWidget {
+//   const CrabLensApp({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: 'CrabLens',
+//       debugShowCheckedModeBanner: false,
+//       theme: ThemeData(
+//         primaryColor: const Color(0xFFD32F2F),
+//         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD32F2F)),
+//         useMaterial3: true,
+//       ),
+//       home: const SplashScreen(),
+//     );
+//   }
+// }
+
+// // --- SPLASH SCREEN ---
+// class SplashScreen extends StatefulWidget {
+//   const SplashScreen({super.key});
+
+//   @override
+//   State<SplashScreen> createState() => _SplashScreenState();
+// }
+
+// class _SplashScreenState extends State<SplashScreen> {
+//   @override
+//   void initState() {
+//     super.initState();
+//     Future.delayed(const Duration(seconds: 3), () {
+//       if (!mounted) return;
+//       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+//     });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return const Scaffold(
+//       backgroundColor: Colors.white,
+//       body: Center(
+//         child: Column(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             Icon(Icons.search, size: 100, color: Color(0xFFD32F2F)),
+//             SizedBox(height: 20),
+//             Text('CrabLens', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
+//             SizedBox(height: 10),
+//             CircularProgressIndicator(color: Color(0xFFD32F2F)),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // --- LOGIN PAGE ---
+// class LoginPage extends StatelessWidget {
+//   const LoginPage({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       body: Padding(
+//         padding: const EdgeInsets.all(25),
+//         child: Column(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             const Text('Login', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+//             const Text('Enter your credentials to continue', style: TextStyle(color: Colors.grey)),
+//             const SizedBox(height: 30),
+//             TextField(decoration: InputDecoration(prefixIcon: const Icon(Icons.email), hintText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+//             const SizedBox(height: 15),
+//             TextField(obscureText: true, decoration: InputDecoration(prefixIcon: const Icon(Icons.lock), hintText: 'Password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+//             const SizedBox(height: 30),
+//             ElevatedButton(
+//               style: _buttonStyle(),
+//               onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardPage())),
+//               child: const Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 18)),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // --- MAIN DASHBOARD ---
+// class DashboardPage extends StatefulWidget {
+//   const DashboardPage({super.key});
+
+//   @override
+//   State<DashboardPage> createState() => _DashboardPageState();
+// }
+
+// class _DashboardPageState extends State<DashboardPage> {
+//   int _currentIndex = 0;
+//   final List<Widget> _pages = [const HomeScreen(), const HistoryScreen(), const ProfileScreen()];
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('CrabLens', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+//         backgroundColor: const Color(0xFFD32F2F),
+//         centerTitle: true,
+//       ),
+//       body: _pages[_currentIndex],
+//       bottomNavigationBar: BottomNavigationBar(
+//         currentIndex: _currentIndex,
+//         selectedItemColor: const Color(0xFFD32F2F),
+//         onTap: (index) => setState(() => _currentIndex = index),
+//         items: const [
+//           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+//           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+//           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+// // --- SCREEN 1: HOME (INATURALIST INTEGRATION) ---
+// class HomeScreen extends StatelessWidget {
+//   const HomeScreen({super.key});
+
+//   Future<void> _handleImage(BuildContext context, ImageSource source) async {
+//     final ImagePicker picker = ImagePicker();
+//     final XFile? image = await picker.pickImage(source: source);
+
+//     if (image == null) return;
+
+//     // 1. Show Loading
+//     showDialog(
+//       context: context,
+//       barrierDismissible: false,
+//       builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFD32F2F))),
+//     );
+
+//     try {
+//       // 2. Prepare iNaturalist Request
+//       var uri = Uri.parse('https://api.inaturalist.org/v1/computervision/score_image');
+//       var request = http.MultipartRequest('POST', uri);
+        
+//         // UPDATED HEADERS TO PREVENT 401 UNAUTHORIZED
+//         request.headers.addAll({
+//           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+//           'Accept': 'application/json',
+//           'Origin': 'https://www.inaturalist.org',
+//           'Referer': 'https://www.inaturalist.org/',
+//       });
+
+//       request.files.add(await http.MultipartFile.fromPath('image', image.path));
+
+//       var streamedResponse = await request.send();
+//       var response = await http.Response.fromStream(streamedResponse);
+      
+//       print("Status: ${response.statusCode}");
+//       print("Body: ${response.body}");
+//       if (context.mounted) Navigator.pop(context); // Close loader
+
+//       if (response.statusCode == 200) {
+//         var data = jsonDecode(response.body);
+//         var results = data['results'] as List;
+
+//         if (results.isNotEmpty) {
+//           var topResult = results[0];
+//           String commonName = topResult['taxon']['preferred_common_name'] ?? topResult['taxon']['name'];
+//           String scientificName = topResult['taxon']['name'];
+//           double visionScore = topResult['vision_score'] ?? 0.0;
+//           String confidence = "${(visionScore * 100).toStringAsFixed(1)}%";
+
+//           if (context.mounted) {
+//             _showResult(context, image.path, commonName, scientificName, confidence);
+//           }
+//         } else {
+//           _showError(context, "No species found in image.");
+//         }
+//       } else {
+//         _showError(context, "API Error: ${response.statusCode}");
+//       }
+//     } catch (e) {
+//       if (context.mounted) Navigator.pop(context);
+//       _showError(context, "Connection Error. Check your internet.");
+//     }
+//   }
+
+//   void _showResult(BuildContext context, String path, String common, String scientific, String confidence) {
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         title: const Text("iNaturalist Identification"),
+//         content: SizedBox(
+//           width: 300,
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(path), height: 180, width: double.infinity, fit: BoxFit.cover)),
+//               const SizedBox(height: 15),
+//               Text(common, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFFD32F2F))),
+//               Text(scientific, style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+//               const SizedBox(height: 5),
+//               Text("Confidence: $confidence", style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.green)),
+//             ],
+//           ),
+//         ),
+//         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+//       ),
+//     );
+//   }
+
+//   void _showError(BuildContext context, String message) {
+//     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Padding(
+//       padding: const EdgeInsets.all(20),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           const Text("Welcome back!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+//           const Text("Identify crabs via iNaturalist AI."),
+//           const SizedBox(height: 30),
+//           Row(
+//             children: [
+//               Expanded(child: _actionCard(Icons.camera_alt, 'Camera', () => _handleImage(context, ImageSource.camera))),
+//               const SizedBox(width: 15),
+//               Expanded(child: _actionCard(Icons.photo_library, 'Upload', () => _handleImage(context, ImageSource.gallery))),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+// // --- SCREEN 2: HISTORY ---
+// class HistoryScreen extends StatelessWidget {
+//   const HistoryScreen({super.key});
+//   @override
+//   Widget build(BuildContext context) => const Center(child: Text("History list will appear here"));
+// }
+
+// // --- SCREEN 3: PROFILE ---
+// class ProfileScreen extends StatelessWidget {
+//   const ProfileScreen({super.key});
+//   @override
+//   Widget build(BuildContext context) => const Center(child: Text("User Profile Settings"));
+// }
+
+// // --- HELPERS ---
+// ButtonStyle _buttonStyle() => ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD32F2F), minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)));
+
+// Widget _actionCard(IconData icon, String text, VoidCallback onTap) {
+//   return InkWell(
+//     onTap: onTap,
+//     borderRadius: BorderRadius.circular(15),
+//     child: Container(
+//       padding: const EdgeInsets.all(25),
+//       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)]),
+//       child: Column(children: [Icon(icon, size: 40, color: const Color(0xFFD32F2F)), const SizedBox(height: 10), Text(text, style: const TextStyle(fontWeight: FontWeight.bold))]),
+//     ),
+//   );
+// }
+
+
+// import 'package:flutter/material.dart';
+// import 'package:image_picker/image_picker.dart';
+// import 'dart:io';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http; // Real API calls
+
+// void main() {
+//   runApp(const CrabLensApp());
+// }
+
+// class CrabLensApp extends StatelessWidget {
+//   const CrabLensApp({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: 'CrabLens',
+//       debugShowCheckedModeBanner: false,
+//       theme: ThemeData(
+//         primaryColor: const Color(0xFFD32F2F),
+//         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD32F2F)),
+//         useMaterial3: true,
+//       ),
+//       home: const SplashScreen(),
+//     );
+//   }
+// }
+
+// // --- SPLASH SCREEN ---
+// class SplashScreen extends StatefulWidget {
+//   const SplashScreen({super.key});
+
+//   @override
+//   State<SplashScreen> createState() => _SplashScreenState();
+// }
+
+// class _SplashScreenState extends State<SplashScreen> {
+//   @override
+//   void initState() {
+//     super.initState();
+//     Future.delayed(const Duration(seconds: 3), () {
+//       if (!mounted) return;
+//       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+//     });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return const Scaffold(
+//       backgroundColor: Colors.white,
+//       body: Center(
+//         child: Column(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             Icon(Icons.search, size: 100, color: Color(0xFFD32F2F)),
+//             SizedBox(height: 20),
+//             Text('CrabLens', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
+//             SizedBox(height: 10),
+//             CircularProgressIndicator(color: Color(0xFFD32F2F)),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // --- LOGIN PAGE ---
+// class LoginPage extends StatelessWidget {
+//   const LoginPage({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       body: Padding(
+//         padding: const EdgeInsets.all(25),
+//         child: Column(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             const Text('Login', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+//             const Text('Enter your credentials to continue', style: TextStyle(color: Colors.grey)),
+//             const SizedBox(height: 30),
+//             TextField(decoration: InputDecoration(prefixIcon: const Icon(Icons.email), hintText: 'Email', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+//             const SizedBox(height: 15),
+//             TextField(obscureText: true, decoration: InputDecoration(prefixIcon: const Icon(Icons.lock), hintText: 'Password', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+//             const SizedBox(height: 30),
+//             ElevatedButton(
+//               style: _buttonStyle(),
+//               onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardPage())),
+//               child: const Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 18)),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // --- MAIN DASHBOARD ---
+// class DashboardPage extends StatefulWidget {
+//   const DashboardPage({super.key});
+
+//   @override
+//   State<DashboardPage> createState() => _DashboardPageState();
+// }
+
+// class _DashboardPageState extends State<DashboardPage> {
+//   int _currentIndex = 0;
+//   final List<Widget> _pages = [const HomeScreen(), const HistoryScreen(), const ProfileScreen()];
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('CrabLens', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+//         backgroundColor: const Color(0xFFD32F2F),
+//         centerTitle: true,
+//       ),
+//       body: _pages[_currentIndex],
+//       bottomNavigationBar: BottomNavigationBar(
+//         currentIndex: _currentIndex,
+//         selectedItemColor: const Color(0xFFD32F2F),
+//         onTap: (index) => setState(() => _currentIndex = index),
+//         items: const [
+//           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+//           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+//           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+// // --- SCREEN 1: HOME (INATURALIST INTEGRATION) ---
+// class HomeScreen extends StatelessWidget {
+//   const HomeScreen({super.key});
+
+//   Future<void> _handleImage(BuildContext context, ImageSource source) async {
+//     final ImagePicker picker = ImagePicker();
+//     final XFile? image = await picker.pickImage(source: source);
+
+//     if (image == null) return;
+
+//     // 1. Show Loading
+//     showDialog(
+//       context: context,
+//       barrierDismissible: false,
+//       builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFD32F2F))),
+//     );
+
+//     try {
+//       // 2. Prepare iNaturalist Request
+//       var uri = Uri.parse('https://api.inaturalist.org/v1/computervision/score_image');
+//       var request = http.MultipartRequest('POST', uri);
+
+//       // IMPORTANT: Some APIs return 404 or 403 if they don't see a User-Agent
+//       request.headers.addAll({
+//         'User-Agent': 'CrabLens-School-Project',
+//         'Accept': 'application/json',
+//       });
+//       request.files.add(await http.MultipartFile.fromPath('image', image.path));
+
+//       // 3. Send Request
+//       var streamedResponse = await request.send();
+//       var response = await http.Response.fromStream(streamedResponse);
+
+//       if (context.mounted) Navigator.pop(context); // Close loader
+
+//       if (response.statusCode == 200) {
+//         var data = jsonDecode(response.body);
+//         var results = data['results'] as List;
+
+//         if (results.isNotEmpty) {
+//           var topResult = results[0];
+//           String commonName = topResult['taxon']['preferred_common_name'] ?? topResult['taxon']['name'];
+//           String scientificName = topResult['taxon']['name'];
+//           double visionScore = topResult['vision_score'] ?? 0.0;
+//           String confidence = "${(visionScore * 100).toStringAsFixed(1)}%";
+
+//           if (context.mounted) {
+//             _showResult(context, image.path, commonName, scientificName, confidence);
+//           }
+//         } else {
+//           _showError(context, "No species found in image.");
+//         }
+//       } else {
+//         _showError(context, "API Error: ${response.statusCode}");
+//       }
+//     } catch (e) {
+//       if (context.mounted) Navigator.pop(context);
+//       _showError(context, "Connection Error. Check your internet.");
+//     }
+//   }
+
+//   void _showResult(BuildContext context, String path, String common, String scientific, String confidence) {
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         title: const Text("iNaturalist Identification"),
+//         content: SizedBox(
+//           width: 300,
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(path), height: 180, width: double.infinity, fit: BoxFit.cover)),
+//               const SizedBox(height: 15),
+//               Text(common, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFFD32F2F))),
+//               Text(scientific, style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+//               const SizedBox(height: 5),
+//               Text("Confidence: $confidence", style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.green)),
+//             ],
+//           ),
+//         ),
+//         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+//       ),
+//     );
+//   }
+
+//   void _showError(BuildContext context, String message) {
+//     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Padding(
+//       padding: const EdgeInsets.all(20),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           const Text("Welcome back!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+//           const Text("Identify crabs via iNaturalist AI."),
+//           const SizedBox(height: 30),
+//           Row(
+//             children: [
+//               Expanded(child: _actionCard(Icons.camera_alt, 'Camera', () => _handleImage(context, ImageSource.camera))),
+//               const SizedBox(width: 15),
+//               Expanded(child: _actionCard(Icons.photo_library, 'Upload', () => _handleImage(context, ImageSource.gallery))),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+// // --- SCREEN 2: HISTORY ---
+// class HistoryScreen extends StatelessWidget {
+//   const HistoryScreen({super.key});
+//   @override
+//   Widget build(BuildContext context) => const Center(child: Text("History list will appear here"));
+// }
+
+// // --- SCREEN 3: PROFILE ---
+// class ProfileScreen extends StatelessWidget {
+//   const ProfileScreen({super.key});
+//   @override
+//   Widget build(BuildContext context) => const Center(child: Text("User Profile Settings"));
+// }
+
+// // --- HELPERS ---
+// ButtonStyle _buttonStyle() => ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD32F2F), minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)));
+
+// Widget _actionCard(IconData icon, String text, VoidCallback onTap) {
+//   return InkWell(
+//     onTap: onTap,
+//     borderRadius: BorderRadius.circular(15),
+//     child: Container(
+//       padding: const EdgeInsets.all(25),
+//       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)]),
+//       child: Column(children: [Icon(icon, size: 40, color: const Color(0xFFD32F2F)), const SizedBox(height: 10), Text(text, style: const TextStyle(fontWeight: FontWeight.bold))]),
+//     ),
+//   );
+// }
