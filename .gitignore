@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+# Flutter generated files
+android/local.properties
+**/GeneratedPluginRegistrant.*
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Runner.xcworkspace/xcuserdata/
+
+# Android / IntelliJ generated files
+*.iml
