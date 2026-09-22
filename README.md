@@ -1,221 +1,161 @@
-🦀 CrabLens
+# 🦀 CrabLens
 
-Crab Classification Using TensorFlow Lite
+### Crab Classification Using TensorFlow Lite
 
-CrabLens is a mobile application designed to classify crab species using an on-device TensorFlow Lite image classification model. The application allows users to capture or select an image of a crab and receive an model-generated species prediction, confidence score, species information, and safety classification.
+CrabLens is a mobile application designed to classify crab species using an **on-device TensorFlow Lite image classification model**. The application allows users to capture or select an image of a crab and receive a model-generated species classification, confidence score, species information, and safety classification.
 
-The project was developed as an academic/thesis project with a focus on mobile image classification, species classification, and crab safety awareness.
+The project was developed as an academic/thesis project with a focus on **mobile image classification, species classification, and crab safety awareness**.
 
-📱 About CrabLens
+---
+
+## 📱 About CrabLens
 
 CrabLens provides a simple and accessible way to classify selected crab species using an on-device image classification model.
 
-Instead of relying on cloud-based image recognition services, CrabLens uses a TensorFlow Lite model directly on the device, allowing image classification to work without sending the user's crab images to an external vision API.
+Instead of relying on cloud-based image recognition services, CrabLens uses a **TensorFlow Lite model directly on the device**, allowing image classification to work without sending the user's crab images to an external vision service.
 
-Core capabilities
+### Core Capabilities
 
-🦀 TensorFlow Lite-based crab species classification
+* 🦀 TensorFlow Lite-based crab species classification
+* 📷 Image capture using the device camera
+* 🖼️ Image selection from the gallery
+* 📊 Classification confidence score
+* 📚 Species information database
+* ⚠️ Safety awareness information
+* 🟢 Edible / commonly consumed classification
+* 🔴 Potentially toxic species warning
+* 📝 Scan history
+* 📱 Mobile-friendly Flutter interface
+* 🔌 Offline species information
+* 💾 Local history storage using SharedPreferences
 
-📷 Image capture using the device camera
+---
 
-🖼️ Image selection from the gallery
+## 🧠 Classification Model
 
-🧠 TensorFlow Lite on-device classification
+CrabLens uses a **TensorFlow Lite (`.tflite`) image classification model** for crab species classification.
 
-📊 Classification confidence score
+### Model File
 
-📚 Species information database
-
-⚠️ Toxicity and safety awareness
-
-🟢 Edible / potentially edible classification
-
-🔴 Potentially toxic species warning
-
-📝 Scan history
-
-📱 Mobile-friendly Flutter interface
-
-🔌 Offline species information
-
-💾 Local history storage using SharedPreferences
-
-🧠 Classification Model
-
-CrabLens uses a TensorFlow Lite (.tflite) image classification model for crab classification.
-
-Model
-
+```text
 assets/model/model_unquant.tflite
+```
 
 Class labels are stored in:
 
+```text
 assets/model/labels.txt
+```
 
 The model performs image classification directly on the user's device.
 
-Why TensorFlow Lite?
+### Why TensorFlow Lite?
 
 Using TensorFlow Lite provides several advantages:
 
-On-device inference
+* On-device inference
+* No external vision API required
+* Reduced network dependency
+* Fast classification
+* Improved privacy
+* Suitable for mobile deployment
+* Can operate without an internet connection
 
-No external vision API required
+The model was trained for crab species classification and integrated into the Flutter application for on-device inference.
 
-Reduced network dependency
+---
 
-Faster classification
-
-Improved privacy
-
-Suitable for mobile deployment
-
-Can operate without an internet connection
-
-The model was trained for crab-species classification and integrated into the Flutter application for real-time image analysis.
-
-🦀 Supported Crab Species
+## 🦀 Supported Crab Species
 
 CrabLens currently supports the following species/classes:
 
-Common Name
+| Common Name       | Scientific Name           |
+| ----------------- | ------------------------- |
+| Alimango          | *Scylla serrata*          |
+| Alimasag          | *Portunus pelagicus*      |
+| Devil Crab        | *Zosimus aeneus*          |
+| Mosaic Crab       | *Lophozozymus pictor*     |
+| Floral Egg Crab   | *Atergatis floridus*      |
+| Xanthid Crab      | *Platypodia granulosa*    |
+| Seven Eleven Crab | *Carpilius maculatus*     |
+| Purple Mud Crab   | *Scylla tranquebarica*    |
+| Three-Spot Crab   | *Portunus sanguinolentus* |
+| Spanner Crab      | *Ranina ranina*           |
+| Mangrove Crab     | *Thalamita crenata*       |
+| Orange Mud Crab   | *Scylla olivacea*         |
+| Crucifix Crab     | *Charybdis feriata*       |
 
-Scientific Name
+> Species support may be expanded as additional training data and model classes are added.
 
-Alimango
+---
 
-Scylla serrata
+## ⚠️ Safety Classification
 
-Alimasag
+CrabLens includes a safety-awareness feature that provides information about species commonly consumed and species that may be potentially toxic.
 
-Portunus pelagicus
+### Generally Considered Edible / Commonly Consumed
 
-Devil Crab
+* Alimango
+* Alimasag
+* Purple Mud Crab
+* Three-Spot Crab
+* Spanner Crab
+* Mangrove Crab
+* Orange Mud Crab
+* Crucifix Crab
 
-Zosimus aeneus
+### Potentially Toxic / Not Recommended for Consumption
 
-Mosaic Crab
+* Devil Crab
+* Mosaic Crab
+* Floral Egg Crab
+* Xanthid Crab
+* Seven Eleven Crab
 
-Lophozozymus pictor
+### Important Safety Disclaimer
 
-Floral Egg Crab
+**CrabLens is an educational classification and information tool only.**
 
-Atergatis floridus
+A model classification does not guarantee the identity, edibility, or safety of a crab. Users should **never consume a crab solely because CrabLens classifies it as edible**.
 
-Xanthid Crab
+Classification results may be affected by image quality, lighting, crab orientation, physical variation, model limitations, and similarities between species.
 
-Platypodia granulosa
+When dealing with potentially poisonous or unfamiliar crab species, users should consult qualified local experts or appropriate fisheries or marine authorities.
 
-Seven Eleven Crab
+---
 
-Carpilius maculatus
+## 🏗️ Technology Stack
 
-Purple Mud Crab
+### Frontend
 
-Scylla tranquebarica
+* Flutter
+* Dart
+* Material Design
 
-Three-Spot Crab
+### Image Classification
 
-Portunus sanguinolentus
+* TensorFlow Lite
+* Image classification
+* Custom-trained classification model
 
-Spanner Crab
+### Local Storage
 
-Ranina ranina
+* SharedPreferences
 
-Mangrove Crab
+### Development Tools
 
-Thalamita crenata
+* Android Studio
+* Visual Studio Code
+* Flutter SDK
+* Dart SDK
+* Git
+* GitHub
 
-Orange Mud Crab
+---
 
-Scylla olivacea
+## 📂 Project Structure
 
-Crucifix Crab
-
-Charybdis feriata
-
-Species support may be expanded as additional training data and model classes are added.
-
-⚠️ Safety Classification
-
-CrabLens includes a safety-awareness feature to help users distinguish between commonly consumed crab species and species that may be potentially toxic.
-
-Generally considered edible / commonly consumed
-
-Alimango
-
-Alimasag
-
-Purple Mud Crab
-
-Three-Spot Crab
-
-Spanner Crab
-
-Mangrove Crab
-
-Orange Mud Crab
-
-Crucifix Crab
-
-Potentially toxic / not recommended for consumption
-
-Devil Crab
-
-Mosaic Crab
-
-Floral Egg Crab
-
-Xanthid Crab
-
-Seven Eleven Crab
-
-Important Safety Disclaimer
-
-CrabLens is an educational and classification tool only.
-
-An model prediction does not guarantee the identity, edibility, or safety of a crab.
-
-Users should never consume a crab solely because CrabLens identifies it as edible. Species classification can be affected by image quality, lighting, crab orientation, physical variation, model limitations, and similarities between species.
-
-When dealing with potentially poisonous or unfamiliar crab species, consult qualified local experts or appropriate fisheries/marine authorities.
-
-🏗️ Technology Stack
-
-Frontend
-
-Flutter
-
-Dart
-
-Material Design
-
-Image Classification
-
-TensorFlow Lite
-
-Image classification
-
-Custom-trained classification model
-
-Local Storage
-
-SharedPreferences
-
-Development
-
-Android Studio / Visual Studio Code
-
-Flutter SDK
-
-Dart SDK
-
-Git
-
-GitHub
-
-📂 Project Structure
-
+```text
 CrabLens/
 │
 ├── android/
@@ -267,9 +207,13 @@ CrabLens/
 ├── pubspec.lock
 ├── analysis_options.yaml
 └── README.md
+```
 
-🔄 Application Flow
+---
 
+## 🔄 Application Flow
+
+```text
                     ┌─────────────────┐
                     │    CrabLens     │
                     │     Launch      │
@@ -277,14 +221,20 @@ CrabLens/
                              │
                              ▼
                     ┌─────────────────┐
-                    │    Home Screen  │
+                    │   Home Screen   │
                     └────────┬────────┘
                              │
                      Capture / Select
                              │
                              ▼
                     ┌─────────────────┐
-                    │   Crab Image    │
+                    │    Crab Image   │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Image Processing│
+                    │   & Preparation │
                     └────────┬────────┘
                              │
                              ▼
@@ -295,7 +245,8 @@ CrabLens/
                              │
                              ▼
                     ┌─────────────────┐
-                    │ Species Result  │
+                    │ Classification  │
+                    │     Result      │
                     │ + Confidence    │
                     └────────┬────────┘
                              │
@@ -310,66 +261,66 @@ CrabLens/
                     │  Save to Local  │
                     │     History     │
                     └─────────────────┘
+```
 
-📱 Main Application Screens
+---
 
-Home
+## 📱 Main Application Screens
+
+### Home
 
 The main entry point of CrabLens where users can start the classification process.
 
-Crab Classification
+### Crab Classification
 
-Users can provide a crab image using the camera or device gallery.
+Users can provide a crab image using the device camera or gallery.
 
-Classification Result
+### Classification Result
 
 The application displays:
 
-Predicted crab species
+* Classified crab species
+* Classification confidence percentage
+* Crab image
+* Common name
+* Scientific name
+* Safety classification
 
-Confidence percentage
-
-Crab image
-
-Common name
-
-Scientific name
-
-Safety classification
-
-Crab Details
+### Crab Details
 
 Provides additional information about the classified species, including:
 
-Species description
+* Species description
+* Scientific classification
+* Local/common names
+* Classification information
+* Safety information
 
-Scientific classification
+### History
 
-Local/common names
+Previously classified crabs are stored locally so users can review their previous scans.
 
-Classification information
-
-Safety information
-
-History
-
-Previously analyzed crabs are stored locally so users can review their previous scans.
-
-About
+### About
 
 Provides information about CrabLens, the classification technology, supported species, project information, and safety disclaimer.
 
-💾 Local Data Storage
+---
+
+## 💾 Local Data Storage
 
 CrabLens does not require user registration or an online account.
 
 Scan history is stored locally using:
 
+```text
 SharedPreferences
+```
 
-This allows previous scan results to remain available on the user's device without requiring a backend server.
+This allows previous classification results to remain available on the user's device without requiring a backend server.
 
-🔒 Privacy
+---
+
+## 🔒 Privacy
 
 CrabLens is designed around local processing.
 
@@ -377,237 +328,206 @@ The TensorFlow Lite model performs classification directly on the device. Crab i
 
 The application does not require:
 
-User accounts
+* User accounts
+* Passwords
+* Cloud database accounts
+* External vision APIs
 
-Passwords
+---
 
-Cloud database accounts
-
-External vision APIs
-
-⚙️ Requirements
+## ⚙️ Requirements
 
 Before running the project, install:
 
-Flutter SDK
+* Flutter SDK
+* Dart SDK
+* Android Studio or Visual Studio Code
+* Android SDK for Android development
+* Xcode for iOS development on macOS
 
-Dart SDK
+Verify the Flutter installation:
 
-Android Studio or Visual Studio Code
-
-Android SDK for Android development
-
-Xcode for iOS development on macOS
-
-Verify Flutter installation:
-
+```bash
 flutter doctor
+```
 
-🚀 Installation
+---
+
+## 🚀 Installation
 
 Clone the repository:
 
+```bash
 git clone https://github.com/riankmviloria/CrabLens.git
+```
 
 Enter the project directory:
 
+```bash
 cd CrabLens
+```
 
 Install dependencies:
 
+```bash
 flutter pub get
+```
 
 Run the application:
 
+```bash
 flutter run
+```
 
 To check connected devices:
 
+```bash
 flutter devices
+```
 
-🧪 Testing
+---
+
+## 🧪 Testing
 
 Before deployment, CrabLens should be evaluated using representative images from each supported species.
 
 Testing should consider:
 
-Different lighting conditions
+* Different lighting conditions
+* Different crab orientations
+* Different backgrounds
+* Different image distances
+* Different crab sizes
+* Partial visibility
+* Similar-looking species
+* Low-quality images
 
-Different crab orientations
-
-Different backgrounds
-
-Different image distances
-
-Different crab sizes
-
-Partial visibility
-
-Similar-looking species
-
-Low-quality images
-
-Model evaluation metrics
+### Model Evaluation Metrics
 
 For formal model evaluation, the following metrics may be used:
 
-Accuracy
-
-Precision
-
-Recall
-
-F1-score
-
-Confusion matrix
+* Accuracy
+* Precision
+* Recall
+* F1-score
+* Confusion matrix
 
 These metrics should be calculated using a test dataset that is separate from the training dataset.
 
-⚠️ Current Limitations
+---
+
+## ⚠️ Current Limitations
 
 CrabLens has several limitations:
 
-The classification model can only classify species included in its training classes.
+1. The classification model can only classify species included in its training classes.
+2. Similar-looking species may be difficult to distinguish.
+3. Classification performance depends on image quality.
+4. Poor lighting may affect classification.
+5. Occluded or partially visible crabs may produce incorrect classifications.
+6. Classification confidence does not guarantee correct classification.
+7. The application should not be used as the sole basis for determining whether a crab is safe to eat.
+8. The current model may require additional training data to improve generalization.
 
-Similar-looking species may be difficult to distinguish.
+---
 
-Prediction accuracy depends on image quality.
-
-Poor lighting may affect classification.
-
-Occluded or partially visible crabs may produce incorrect predictions.
-
-classification confidence does not guarantee correct classification.
-
-The application should not be used as the sole basis for determining whether a crab is safe to eat.
-
-The current model may require additional training data to improve generalization.
-
-🔮 Future Enhancements
+## 🔮 Future Enhancements
 
 Potential future improvements include:
 
-Additional crab species
+* Additional crab species
+* Larger and more diverse training datasets
+* Improved classification performance
+* Model evaluation and benchmarking
+* Confusion matrix visualization
+* Improved species comparison
+* More detailed geographic information
+* Habitat information
+* Crab size estimation
+* Improved image preprocessing
+* Model version management
+* User feedback for incorrect classifications
+* Model update system
+* Research dataset management
+* Expert-verified species information
 
-Larger and more diverse training datasets
+---
 
-Improved model accuracy
-
-Model evaluation and benchmarking
-
-Confusion matrix visualization
-
-Improved species comparison
-
-More detailed geographic information
-
-Habitat information
-
-Crab size estimation
-
-Improved image preprocessing
-
-Model version management
-
-User feedback for incorrect predictions
-
-Cloud-based model update system
-
-Research dataset management
-
-Expert-verified species information
-
-🎓 Academic Project
+## 🎓 Academic Project
 
 CrabLens was developed as an academic/thesis project demonstrating the practical application of:
 
-Image Classification
+* Image Classification
+* Machine Learning
+* TensorFlow Lite
+* Mobile Application Development
+* Flutter
+* Local Data Storage
+* Species Classification
+* Safety Awareness
 
-Machine Learning
+### Project Team
 
-Image Classification
+* Eli Edon
+* Anthony Eglesias
+* Hero Elayda
+* Cresza Joy Mojar
+* Jhapil Taneo
 
-TensorFlow Lite
+---
 
-Mobile Application Development
-
-Flutter
-
-Local Data Storage
-
-Species Classification
-
-Safety Awareness
-
-Project Team
-
-Eli Edon
-
-Anthony Eglesias
-
-Hero Elayda
-
-Cresza Joy Mojar
-
-Jhapil Taneo
-
-📄 Documentation
+## 📄 Documentation
 
 Additional project documentation covers:
 
-Project overview
+* Project overview
+* Problem statement
+* Objectives
+* Scope and limitations
+* System architecture
+* Classification model
+* Supported species
+* Application flow
+* Data storage
+* Safety handling
+* Installation
+* Testing
+* Future enhancements
 
-Problem statement
+---
 
-Objectives
+## 🦀 About the Name
 
-Scope and limitations
+**CrabLens** combines:
 
-System architecture
+> **Crab + Lens**
 
-classification model
+The name represents the use of a camera lens together with image classification to help classify crab species.
 
-Supported species
+---
 
-Application flow
+## 📌 Project Status
 
-Data storage
-
-Safety handling
-
-Installation
-
-Testing
-
-Future enhancements
-
-🦀 About the Name
-
-CrabLens combines:
-
-Crab + Lens
-
-The name represents using a camera lens together with image classification to help classify crab species.
-
-📌 Project Status
-
-Version: 1.0.0
-
-Status: Active Development
+**Version:** 1.0.0
+**Status:** Active Development
 
 CrabLens is currently being developed and improved as an academic/thesis project.
 
-⚖️ Disclaimer
+---
 
-CrabLens is intended for educational, research, and informational purposes only.
+## ⚖️ Disclaimer
 
-The application and its classification model may produce incorrect predictions. Species classification should be independently verified, particularly when determining whether a crab is safe for consumption.
+CrabLens is intended for **educational, research, and informational purposes only**.
 
-The developers are not responsible for injury, poisoning, illness, loss, or other consequences resulting from reliance on CrabLens predictions.
+The application and its classification model may produce incorrect results. Species classification should be independently verified, particularly when determining whether a crab is safe for consumption.
 
-When in doubt, do not consume the crab.
+The developers are not responsible for injury, poisoning, illness, loss, or other consequences resulting from reliance on CrabLens classification results.
 
-📜 License
+**When in doubt, do not consume the crab.**
+
+---
+
+## 📜 License
 
 This project is developed for academic and educational purposes.
 
