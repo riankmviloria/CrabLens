@@ -1,6 +1,6 @@
-# 🦀 CrabLens AI
+# 🦀 CrabLens
 
-### AI-Powered Crab Identification Using TensorFlow Lite
+### Crab Classification Using TensorFlow Lite
 
 CrabLens AI is a mobile application designed to identify crab species using an **on-device TensorFlow Lite image classification model**. The application allows users to capture or select an image of a crab and receive an AI-generated species prediction, confidence score, species information, and safety classification.
 
