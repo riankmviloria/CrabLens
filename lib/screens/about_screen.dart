@@ -219,7 +219,7 @@ class _AboutScreenState extends State<AboutScreen>
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        'AI-Powered Crab Identification',
+                        'Crab Classification',
                         style: TextStyle(
                           fontSize: 15,
                           color: Colors.grey.shade600,
@@ -261,8 +261,8 @@ class _AboutScreenState extends State<AboutScreen>
                   icon: Icons.info_outline,
                   title: 'About the App',
                   child: const Text(
-                    'CrabLens is an AI-powered mobile application designed '
-                    'to help users identify different crab species through '
+                    'CrabLens is a mobile application designed '
+                    'to help users classify different crab species through '
                     'image recognition. Simply capture or upload an image '
                     'of a crab and CrabLens analyzes its visual features '
                     'using a TensorFlow Lite machine learning model.',
@@ -273,13 +273,13 @@ class _AboutScreenState extends State<AboutScreen>
               const SizedBox(height: 16),
 
               // ─────────────────────────────────────────────
-              // AI TECHNOLOGY
+              // CLASSIFICATION TECHNOLOGY
               // ─────────────────────────────────────────────
               _animatedSection(
                 index: 1,
                 child: _sectionCard(
                   icon: Icons.psychology_outlined,
-                  title: 'AI Technology',
+                  title: 'Classification Technology',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -297,7 +297,7 @@ class _AboutScreenState extends State<AboutScreen>
                       const _InfoRow(
                         icon: Icons.smartphone_outlined,
                         label: 'Processing',
-                        value: 'On-device AI',
+                        value: 'On-device Model',
                       ),
                       const _InfoRow(
                         icon: Icons.category_outlined,
@@ -358,7 +358,7 @@ class _AboutScreenState extends State<AboutScreen>
                         icon: Icons.warning_amber_rounded,
                         title: 'Not Edible / Potentially Toxic',
                         subtitle:
-                            'Do not consume based on AI identification alone',
+                            'Do not consume based on model classification alone',
                         color: Colors.red.shade700,
                         backgroundColor: Colors.red.shade50,
                       ),
@@ -431,9 +431,9 @@ class _AboutScreenState extends State<AboutScreen>
                             SizedBox(height: 6),
                             Text(
                               'CrabLens is intended for educational and '
-                              'identification purposes only. AI predictions '
+                              'classification purposes only. Model predictions '
                               'should not be treated as a definitive '
-                              'identification or safety guarantee.',
+                              'classification or safety guarantee.',
                               style: TextStyle(
                                 fontSize: 13,
                                 height: 1.5,
@@ -472,11 +472,11 @@ class _AboutScreenState extends State<AboutScreen>
                       _InfoRow(
                         icon: Icons.auto_awesome_outlined,
                         label: 'Core Feature',
-                        value: 'AI Crab Identification',
+                        value: 'Crab Classification',
                       ),
                       _InfoRow(
                         icon: Icons.memory_outlined,
-                        label: 'AI Model',
+                        label: 'Classification Model',
                         value: 'TensorFlow Lite',
                       ),
                     ],

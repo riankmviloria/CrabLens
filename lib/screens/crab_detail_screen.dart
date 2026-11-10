@@ -1,10 +1,16 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/data/crab_database.dart';
 import '../models/crab_info.dart';
+import '../widgets/crab_share_card.dart';
 
 class CrabDetailScreen extends StatefulWidget {
   final String speciesName;
@@ -25,6 +31,9 @@ class CrabDetailScreen extends StatefulWidget {
 class _CrabDetailScreenState extends State<CrabDetailScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
+
+  // Used to capture the complete long-form share card.
+  final GlobalKey _shareCardKey = GlobalKey();
 
   late Animation<double> _imageFade;
   late Animation<double> _imageScale;
@@ -58,24 +67,13 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     _imageFade = CurvedAnimation(
       parent: _animationController,
-      curve: const Interval(
-        0.0,
-        0.30,
-        curve: Curves.easeOut,
-      ),
+      curve: const Interval(0.0, 0.30, curve: Curves.easeOut),
     );
 
-    _imageScale = Tween<double>(
-      begin: 0.94,
-      end: 1.0,
-    ).animate(
+    _imageScale = Tween<double>(begin: 0.94, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(
-          0.0,
-          0.40,
-          curve: Curves.easeOutCubic,
-        ),
+        curve: const Interval(0.0, 0.40, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -85,26 +83,16 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     _titleFade = CurvedAnimation(
       parent: _animationController,
-      curve: const Interval(
-        0.18,
-        0.45,
-        curve: Curves.easeOut,
-      ),
+      curve: const Interval(0.18, 0.45, curve: Curves.easeOut),
     );
 
-    _titleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.15),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(
-          0.18,
-          0.50,
-          curve: Curves.easeOutCubic,
-        ),
-      ),
-    );
+    _titleSlide = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.18, 0.50, curve: Curves.easeOutCubic),
+          ),
+        );
 
     // ============================================================
     // IDENTITY
@@ -112,26 +100,16 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     _identityFade = CurvedAnimation(
       parent: _animationController,
-      curve: const Interval(
-        0.32,
-        0.60,
-        curve: Curves.easeOut,
-      ),
+      curve: const Interval(0.32, 0.60, curve: Curves.easeOut),
     );
 
-    _identitySlide = Tween<Offset>(
-      begin: const Offset(0, 0.10),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(
-          0.32,
-          0.60,
-          curve: Curves.easeOutCubic,
-        ),
-      ),
-    );
+    _identitySlide =
+        Tween<Offset>(begin: const Offset(0, 0.10), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.32, 0.60, curve: Curves.easeOutCubic),
+          ),
+        );
 
     // ============================================================
     // CONFIDENCE
@@ -139,11 +117,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     _confidenceFade = CurvedAnimation(
       parent: _animationController,
-      curve: const Interval(
-        0.45,
-        0.68,
-        curve: Curves.easeOut,
-      ),
+      curve: const Interval(0.45, 0.68, curve: Curves.easeOut),
     );
 
     // ============================================================
@@ -152,26 +126,16 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     _contentFade = CurvedAnimation(
       parent: _animationController,
-      curve: const Interval(
-        0.55,
-        0.88,
-        curve: Curves.easeOut,
-      ),
+      curve: const Interval(0.55, 0.88, curve: Curves.easeOut),
     );
 
-    _contentSlide = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(
-          0.55,
-          0.88,
-          curve: Curves.easeOutCubic,
-        ),
-      ),
-    );
+    _contentSlide =
+        Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.55, 0.88, curve: Curves.easeOutCubic),
+          ),
+        );
 
     // ============================================================
     // SAFETY
@@ -179,28 +143,56 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     _safetyFade = CurvedAnimation(
       parent: _animationController,
-      curve: const Interval(
-        0.68,
-        1.0,
-        curve: Curves.easeOut,
-      ),
+      curve: const Interval(0.68, 1.0, curve: Curves.easeOut),
     );
 
-    _safetySlide = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(
-          0.68,
-          1.0,
-          curve: Curves.easeOutCubic,
-        ),
-      ),
-    );
+    _safetySlide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.68, 1.0, curve: Curves.easeOutCubic),
+          ),
+        );
 
     _animationController.forward();
+  }
+
+  Widget _buildBfarStatus(bool isToxic) {
+    final Color statusColor = isToxic
+        ? Colors.red.shade700
+        : Colors.green.shade700;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: statusColor.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isToxic ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+            color: statusColor,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isToxic
+                  ? 'Documented as non-edible (BFAR)'
+                  : 'Documented as edible (BFAR)',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: statusColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -210,117 +202,123 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
     final bool isToxic = _isToxic(info);
 
     return Scaffold(
-      backgroundColor:
-          isToxic ? const Color(0xFF111111) : Colors.white,
-
-      appBar: _buildAppBar(isToxic),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          20,
-          8,
-          20,
-          35,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ======================================================
-            // IMAGE
-            // ======================================================
-
-            FadeTransition(
-              opacity: _imageFade,
-              child: ScaleTransition(
-                scale: _imageScale,
-                child: _buildImageCard(
-                  isToxic: isToxic,
+      backgroundColor: isToxic ? const Color(0xFF111111) : Colors.white,
+      appBar: _buildAppBar(isToxic, info),
+      body: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // ========================================================
+          // EXISTING DETAIL SCREEN
+          // ========================================================
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 35),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ==================================================
+                // IMAGE
+                // ==================================================
+                FadeTransition(
+                  opacity: _imageFade,
+                  child: ScaleTransition(
+                    scale: _imageScale,
+                    child: _buildImageCard(isToxic: isToxic),
+                  ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // ======================================================
-            // SPECIES TITLE
-            // ======================================================
-
-            FadeTransition(
-              opacity: _titleFade,
-              child: SlideTransition(
-                position: _titleSlide,
-                child: _buildSpeciesTitle(
-                  info: info,
-                  isToxic: isToxic,
+                // ==================================================
+                // SPECIES TITLE
+                // ==================================================
+                FadeTransition(
+                  opacity: _titleFade,
+                  child: SlideTransition(
+                    position: _titleSlide,
+                    child: _buildSpeciesTitle(info: info, isToxic: isToxic),
+                  ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 18),
+                const SizedBox(height: 18),
 
-            // ======================================================
-            // IDENTITY
-            // ======================================================
-
-            FadeTransition(
-              opacity: _identityFade,
-              child: SlideTransition(
-                position: _identitySlide,
-                child: _buildIdentityCard(
-                  info: info,
-                  isToxic: isToxic,
+                // ==================================================
+                // IDENTITY
+                // ==================================================
+                FadeTransition(
+                  opacity: _identityFade,
+                  child: SlideTransition(
+                    position: _identitySlide,
+                    child: _buildIdentityCard(info: info, isToxic: isToxic),
+                  ),
                 ),
-              ),
+
+                const SizedBox(height: 14),
+
+                // ==================================================
+                // CLASSIFICATION CONFIDENCE
+                // ==================================================
+                FadeTransition(
+                  opacity: _confidenceFade,
+                  child: _buildConfidenceCard(isToxic: isToxic),
+                ),
+
+                const SizedBox(height: 14),
+
+                _buildBfarStatus(isToxic),
+
+                const SizedBox(height: 26),
+
+                // ==================================================
+                // INFORMATION
+                // ==================================================
+                FadeTransition(
+                  opacity: _contentFade,
+                  child: SlideTransition(
+                    position: _contentSlide,
+                    child: _buildInformationSection(
+                      info: info,
+                      isToxic: isToxic,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // ==================================================
+                // SAFETY
+                // ==================================================
+                FadeTransition(
+                  opacity: _safetyFade,
+                  child: SlideTransition(
+                    position: _safetySlide,
+                    child: _buildSafetySection(info: info, isToxic: isToxic),
+                  ),
+                ),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 14),
-
-            // ======================================================
-            // AI CONFIDENCE
-            // ======================================================
-
-            FadeTransition(
-              opacity: _confidenceFade,
-              child: _buildConfidenceCard(
+          // ========================================================
+          // LONG-FORM SHARE CARD
+          //
+          // This is a separate widget specifically designed to
+          // become the PNG that gets shared.
+          // ========================================================
+          Positioned(
+            left: -10000,
+            top: 0,
+            child: RepaintBoundary(
+              key: _shareCardKey,
+              child: CrabShareCard(
+                info: info,
+                speciesName: widget.speciesName,
+                imagePath: widget.imagePath,
+                confidence: widget.confidence,
                 isToxic: isToxic,
               ),
             ),
-
-            const SizedBox(height: 26),
-
-            // ======================================================
-            // INFORMATION
-            // ======================================================
-
-            FadeTransition(
-              opacity: _contentFade,
-              child: SlideTransition(
-                position: _contentSlide,
-                child: _buildInformationSection(
-                  info: info,
-                  isToxic: isToxic,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // ======================================================
-            // SAFETY
-            // ======================================================
-
-            FadeTransition(
-              opacity: _safetyFade,
-              child: SlideTransition(
-                position: _safetySlide,
-                child: _buildSafetySection(
-                  info: info,
-                  isToxic: isToxic,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -329,44 +327,140 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
   // APP BAR
   // ============================================================
 
-  PreferredSizeWidget _buildAppBar(bool isToxic) {
+  PreferredSizeWidget _buildAppBar(bool isToxic, CrabInfo? info) {
     return AppBar(
-      backgroundColor:
-          isToxic ? const Color(0xFF111111) : Colors.white,
-      foregroundColor:
-          isToxic ? Colors.white : AppColors.textPrimary,
+      backgroundColor: isToxic ? const Color(0xFF111111) : Colors.white,
+      foregroundColor: isToxic ? Colors.white : AppColors.textPrimary,
       elevation: 0,
       centerTitle: false,
       title: Text(
         isToxic ? 'Safety Alert' : 'Species Details',
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
       ),
+      actions: [
+        IconButton(
+          onPressed: () {
+            _shareClassificationResult(info);
+          },
+          tooltip: 'Share Classification',
+          icon: const Icon(Icons.share_outlined),
+        ),
+        const SizedBox(width: 6),
+      ],
     );
+  }
+
+  // ============================================================
+  // SHARE CLASSIFICATION RESULT
+  // ============================================================
+
+  Future<void> _shareClassificationResult(CrabInfo? info) async {
+    try {
+      // Give Flutter time to finish laying out the hidden share card.
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final BuildContext? shareContext = _shareCardKey.currentContext;
+
+      if (shareContext == null) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to prepare the classification image.'),
+          ),
+        );
+
+        return;
+      }
+
+      final RenderObject? renderObject = shareContext.findRenderObject();
+
+      if (renderObject is! RenderRepaintBoundary) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to generate the classification image.'),
+          ),
+        );
+
+        return;
+      }
+
+      final RenderRepaintBoundary boundary = renderObject;
+
+      // Capture the entire CrabShareCard.
+      //
+      // 1.5 provides a reasonably high-resolution image while
+      // avoiding an unnecessarily large bitmap.
+      final ui.Image image = await boundary.toImage(pixelRatio: 1.5);
+
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+
+      if (byteData == null) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to create the classification image.'),
+          ),
+        );
+
+        return;
+      }
+
+      // ==========================================================
+      // SAVE PNG TO TEMPORARY STORAGE
+      // ==========================================================
+
+      final Directory temporaryDirectory = await getTemporaryDirectory();
+
+      final String fileName =
+          'crablens_classification_'
+          '${DateTime.now().millisecondsSinceEpoch}.png';
+
+      final File imageFile = File('${temporaryDirectory.path}/$fileName');
+
+      await imageFile.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
+
+      // ==========================================================
+      // SHARE PNG
+      // ==========================================================
+
+      final String species = info?.common ?? widget.speciesName;
+
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'CrabLens Classification Result – $species',
+          files: [XFile(imageFile.path)],
+          subject: 'CrabLens Classification Result – $species',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to share classification image: $e')),
+      );
+    }
   }
 
   // ============================================================
   // IMAGE CARD
   // ============================================================
 
-  Widget _buildImageCard({
-    required bool isToxic,
-  }) {
+  Widget _buildImageCard({required bool isToxic}) {
     return Container(
       width: double.infinity,
       height: 270,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isToxic
-            ? const Color(0xFF1A1A1A)
-            : Colors.grey.shade50,
+        color: isToxic ? const Color(0xFF1A1A1A) : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isToxic
-              ? Colors.red.shade800
-              : Colors.grey.shade200,
+          color: isToxic ? Colors.red.shade800 : Colors.grey.shade200,
           width: isToxic ? 1.5 : 1,
         ),
         boxShadow: [
@@ -382,9 +476,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          color: isToxic
-              ? const Color(0xFF0D0D0D)
-              : Colors.grey.shade100,
+          color: isToxic ? const Color(0xFF0D0D0D) : Colors.grey.shade100,
           child: Image.file(
             File(widget.imagePath),
 
@@ -399,9 +491,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
               return Icon(
                 Icons.image_not_supported_outlined,
                 size: 60,
-                color: isToxic
-                    ? Colors.red.shade300
-                    : Colors.grey.shade400,
+                color: isToxic ? Colors.red.shade300 : Colors.grey.shade400,
               );
             },
           ),
@@ -414,12 +504,8 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
   // SPECIES TITLE
   // ============================================================
 
-  Widget _buildSpeciesTitle({
-    required CrabInfo? info,
-    required bool isToxic,
-  }) {
-    final Color accent =
-        isToxic ? Colors.red.shade400 : AppColors.primary;
+  Widget _buildSpeciesTitle({required CrabInfo? info, required bool isToxic}) {
+    final Color accent = isToxic ? Colors.red.shade400 : AppColors.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,16 +513,11 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
         if (isToxic)
           Container(
             margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 11,
-              vertical: 6,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.red.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.red.withValues(alpha: 0.35),
-              ),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.35)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -466,24 +547,19 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
             fontSize: 29,
             height: 1.1,
             fontWeight: FontWeight.w800,
-            color: isToxic
-                ? Colors.white
-                : AppColors.textPrimary,
+            color: isToxic ? Colors.white : AppColors.textPrimary,
           ),
         ),
 
         const SizedBox(height: 6),
 
-        if (info?.local != null &&
-            info!.local.isNotEmpty)
+        if (info?.local != null && info!.local.isNotEmpty)
           Text(
             info.local,
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: isToxic
-                  ? Colors.grey.shade400
-                  : Colors.grey.shade600,
+              color: isToxic ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ),
 
@@ -505,10 +581,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
   // IDENTITY CARD
   // ============================================================
 
-  Widget _buildIdentityCard({
-    required CrabInfo? info,
-    required bool isToxic,
-  }) {
+  Widget _buildIdentityCard({required CrabInfo? info, required bool isToxic}) {
     return _card(
       isToxic: isToxic,
       child: Column(
@@ -539,8 +612,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
     required String value,
     required bool isToxic,
   }) {
-    final Color accent =
-        isToxic ? Colors.red.shade400 : AppColors.primary;
+    final Color accent = isToxic ? Colors.red.shade400 : AppColors.primary;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,11 +624,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
             color: accent.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(11),
           ),
-          child: Icon(
-            icon,
-            color: accent,
-            size: 20,
-          ),
+          child: Icon(icon, color: accent, size: 20),
         ),
 
         const SizedBox(width: 12),
@@ -569,9 +637,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isToxic
-                      ? Colors.grey.shade500
-                      : Colors.grey.shade600,
+                  color: isToxic ? Colors.grey.shade500 : Colors.grey.shade600,
                 ),
               ),
 
@@ -582,9 +648,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: isToxic
-                      ? Colors.white
-                      : AppColors.textPrimary,
+                  color: isToxic ? Colors.white : AppColors.textPrimary,
                 ),
               ),
             ],
@@ -598,11 +662,8 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
   // CONFIDENCE
   // ============================================================
 
-  Widget _buildConfidenceCard({
-    required bool isToxic,
-  }) {
-    final Color accent =
-        isToxic ? Colors.red.shade400 : AppColors.primary;
+  Widget _buildConfidenceCard({required bool isToxic}) {
+    final Color accent = isToxic ? Colors.red.shade400 : AppColors.primary;
 
     return _card(
       isToxic: isToxic,
@@ -615,11 +676,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
               color: accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(
-              Icons.auto_awesome,
-              color: accent,
-              size: 23,
-            ),
+            child: Icon(Icons.auto_awesome, color: accent, size: 23),
           ),
 
           const SizedBox(width: 13),
@@ -629,7 +686,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'AI Confidence',
+                  'Classification Confidence',
                   style: TextStyle(
                     fontSize: 12,
                     color: isToxic
@@ -645,20 +702,14 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: isToxic
-                        ? Colors.white
-                        : AppColors.textPrimary,
+                    color: isToxic ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
           ),
 
-          Icon(
-            Icons.verified_outlined,
-            color: accent,
-            size: 22,
-          ),
+          Icon(Icons.verified_outlined, color: accent, size: 22),
         ],
       ),
     );
@@ -672,8 +723,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
     required CrabInfo? info,
     required bool isToxic,
   }) {
-    final Color accent =
-        isToxic ? Colors.red.shade400 : AppColors.primary;
+    final Color accent = isToxic ? Colors.red.shade400 : AppColors.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,9 +733,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: isToxic
-                ? Colors.white
-                : AppColors.textPrimary,
+            color: isToxic ? Colors.white : AppColors.textPrimary,
           ),
         ),
 
@@ -694,7 +742,8 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
         _infoCard(
           icon: Icons.description_outlined,
           title: 'Description',
-          content: info?.description ??
+          content:
+              info?.description ??
               'Information not available in offline database.',
           accent: accent,
           isToxic: isToxic,
@@ -708,8 +757,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
           isToxic: isToxic,
         ),
 
-        if (info?.characteristics != null &&
-            info!.characteristics.isNotEmpty)
+        if (info?.characteristics != null && info!.characteristics.isNotEmpty)
           _infoCard(
             icon: Icons.search_rounded,
             title: 'Characteristics',
@@ -733,14 +781,10 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isToxic
-            ? const Color(0xFF1A1A1A)
-            : Colors.white,
+        color: isToxic ? const Color(0xFF1A1A1A) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isToxic
-              ? Colors.grey.shade800
-              : Colors.grey.shade200,
+          color: isToxic ? Colors.grey.shade800 : Colors.grey.shade200,
         ),
       ),
       child: Column(
@@ -755,11 +799,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
                   color: accent.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  color: accent,
-                  size: 19,
-                ),
+                child: Icon(icon, color: accent, size: 19),
               ),
 
               const SizedBox(width: 10),
@@ -769,9 +809,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: isToxic
-                      ? Colors.white
-                      : AppColors.textPrimary,
+                  color: isToxic ? Colors.white : AppColors.textPrimary,
                 ),
               ),
             ],
@@ -784,9 +822,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
             style: TextStyle(
               fontSize: 14.5,
               height: 1.5,
-              color: isToxic
-                  ? Colors.grey.shade300
-                  : Colors.grey.shade800,
+              color: isToxic ? Colors.grey.shade300 : Colors.grey.shade800,
             ),
           ),
         ],
@@ -798,10 +834,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
   // SAFETY
   // ============================================================
 
-  Widget _buildSafetySection({
-    required CrabInfo? info,
-    required bool isToxic,
-  }) {
+  Widget _buildSafetySection({required CrabInfo? info, required bool isToxic}) {
     if (isToxic) {
       return _buildToxicSafety(info);
     }
@@ -820,10 +853,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF210D0D),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.red.shade800,
-          width: 1.5,
-        ),
+        border: Border.all(color: Colors.red.shade800, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.red.withValues(alpha: 0.12),
@@ -862,8 +892,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'SAFETY WARNING',
@@ -896,7 +925,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
           Text(
             'This species may contain dangerous '
             'toxins. Do not consume this crab based '
-            'solely on visual identification.',
+            'solely on visual classification.',
             style: TextStyle(
               color: Colors.grey.shade300,
               fontSize: 14,
@@ -906,10 +935,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
           const SizedBox(height: 18),
 
-          _toxicDetail(
-            'Risk',
-            info?.risk ?? 'Unknown',
-          ),
+          _toxicDetail('Risk', info?.risk ?? 'Unknown'),
 
           const SizedBox(height: 10),
 
@@ -922,18 +948,14 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
           _toxicDetail(
             'First Aid',
-            info?.firstAid ??
-                'Consult medical professionals immediately',
+            info?.firstAid ?? 'Consult medical professionals immediately',
           ),
         ],
       ),
     );
   }
 
-  Widget _toxicDetail(
-    String label,
-    String value,
-  ) {
+  Widget _toxicDetail(String label, String value) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -974,9 +996,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
       decoration: BoxDecoration(
         color: Colors.green.shade50,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.green.shade200,
-        ),
+        border: Border.all(color: Colors.green.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1013,34 +1033,24 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
           const SizedBox(height: 15),
 
-          _normalDetail(
-            'Risk',
-            info?.risk ?? 'Unknown',
-          ),
+          _normalDetail('Risk', info?.risk ?? 'Unknown'),
 
           const SizedBox(height: 8),
 
-          _normalDetail(
-            'Handling',
-            info?.handling ?? 'Caution',
-          ),
+          _normalDetail('Handling', info?.handling ?? 'Caution'),
 
           const SizedBox(height: 8),
 
           _normalDetail(
             'First Aid',
-            info?.firstAid ??
-                'Consult medical professionals',
+            info?.firstAid ?? 'Consult medical professionals',
           ),
         ],
       ),
     );
   }
 
-  Widget _normalDetail(
-    String label,
-    String value,
-  ) {
+  Widget _normalDetail(String label, String value) {
     return RichText(
       text: TextSpan(
         style: const TextStyle(
@@ -1051,9 +1061,7 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
         children: [
           TextSpan(
             text: '$label: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           TextSpan(text: value),
         ],
@@ -1065,22 +1073,15 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
   // GENERIC CARD
   // ============================================================
 
-  Widget _card({
-    required bool isToxic,
-    required Widget child,
-  }) {
+  Widget _card({required bool isToxic, required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isToxic
-            ? const Color(0xFF1A1A1A)
-            : Colors.white,
+        color: isToxic ? const Color(0xFF1A1A1A) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isToxic
-              ? Colors.grey.shade800
-              : Colors.grey.shade200,
+          color: isToxic ? Colors.grey.shade800 : Colors.grey.shade200,
         ),
         boxShadow: isToxic
             ? null
@@ -1164,6 +1165,10 @@ class _CrabDetailScreenState extends State<CrabDetailScreen>
 
     return null;
   }
+
+  // ============================================================
+  // NORMALIZE
+  // ============================================================
 
   String _normalize(String value) {
     return value

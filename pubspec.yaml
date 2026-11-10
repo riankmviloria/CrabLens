@@ -36,8 +36,12 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.2.2
-  tflite_flutter: ^0.11.0
   image: ^4.1.7
+  share_plus: ^13.3.0
+  path_provider: ^2.1.6
+  flutter_litert: ^3.9.4
+  camera: ^0.12.0+2
+  audioplayers: ^6.7.1
 
 dev_dependencies:
   flutter_test:
@@ -72,7 +76,9 @@ flutter:
     - assets/icon/app_icon.png
     - assets/model/model_unquant.tflite
     - assets/model/labels.txt
-
+    - assets/icon/app_icon_cl.png
+    - assets/crabs/
+    - assets/sounds/
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

@@ -19,8 +19,7 @@ class _DashboardPageState extends State<DashboardPage>
   final GlobalKey<HistoryScreenState> _historyKey =
       GlobalKey<HistoryScreenState>();
 
-  final GlobalKey<HomeScreenState> _homeKey =
-      GlobalKey<HomeScreenState>();
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
 
   // ============================================================
   // APP BAR ANIMATION
@@ -59,15 +58,13 @@ class _DashboardPageState extends State<DashboardPage>
       curve: Curves.easeOut,
     );
 
-    _appBarSlide = Tween<Offset>(
-      begin: const Offset(0, -0.15),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _appBarController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _appBarSlide =
+        Tween<Offset>(begin: const Offset(0, -0.15), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _appBarController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _appBarController.forward();
 
@@ -80,20 +77,12 @@ class _DashboardPageState extends State<DashboardPage>
       duration: const Duration(milliseconds: 420),
     );
 
-    _pageFade = CurvedAnimation(
-      parent: _pageController,
-      curve: Curves.easeOut,
-    );
+    _pageFade = CurvedAnimation(parent: _pageController, curve: Curves.easeOut);
 
-    _pageSlide = Tween<Offset>(
-      begin: const Offset(0.08, 0),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _pageController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _pageSlide = Tween<Offset>(begin: const Offset(0.08, 0), end: Offset.zero)
+        .animate(
+          CurvedAnimation(parent: _pageController, curve: Curves.easeOutCubic),
+        );
 
     _pageController.value = 1.0;
   }
@@ -114,25 +103,13 @@ class _DashboardPageState extends State<DashboardPage>
     Navigator.push(
       context,
       PageRouteBuilder(
-        transitionDuration:
-            const Duration(milliseconds: 500),
-        reverseTransitionDuration:
-            const Duration(milliseconds: 350),
-        pageBuilder: (
-          _,
-          animation,
-          secondaryAnimation,
-        ) {
+        transitionDuration: const Duration(milliseconds: 500),
+        reverseTransitionDuration: const Duration(milliseconds: 350),
+        pageBuilder: (_, animation, secondaryAnimation) {
           return const AboutScreen();
         },
-        transitionsBuilder: (
-          _,
-          animation,
-          secondaryAnimation,
-          child,
-        ) {
-          final curvedAnimation =
-              CurvedAnimation(
+        transitionsBuilder: (_, animation, secondaryAnimation, child) {
+          final curvedAnimation = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
           );
@@ -164,6 +141,7 @@ class _DashboardPageState extends State<DashboardPage>
 
       if (index == 0) {
         _homeKey.currentState?.loadRecentScans();
+        _homeKey.currentState?.refreshDidYouKnow();
       }
 
       return;
@@ -181,18 +159,13 @@ class _DashboardPageState extends State<DashboardPage>
 
     final bool movingForward = index > _previousIndex;
 
-    _pageSlide = Tween<Offset>(
-      begin: Offset(
-        movingForward ? 0.10 : -0.10,
-        0,
-      ),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _pageController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _pageSlide =
+        Tween<Offset>(
+          begin: Offset(movingForward ? 0.10 : -0.10, 0),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: _pageController, curve: Curves.easeOutCubic),
+        );
 
     // ==========================================================
     // PLAY PAGE ANIMATION
@@ -206,20 +179,17 @@ class _DashboardPageState extends State<DashboardPage>
     // REFRESH DATA
     // ==========================================================
 
-    Future.delayed(
-      const Duration(milliseconds: 100),
-      () {
-        if (!mounted) return;
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
 
-        if (index == 1) {
-          _historyKey.currentState?.loadHistory();
-        }
+      if (index == 1) {
+        _historyKey.currentState?.loadHistory();
+      }
 
-        if (index == 0) {
-          _homeKey.currentState?.loadRecentScans();
-        }
-      },
-    );
+      if (index == 0) {
+        _homeKey.currentState?.loadRecentScans();
+      }
+    });
   }
 
   // ============================================================
@@ -251,22 +221,13 @@ class _DashboardPageState extends State<DashboardPage>
       curve: Curves.easeOutBack,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 240),
-        transitionBuilder: (
-          child,
-          animation,
-        ) {
+        transitionBuilder: (child, animation) {
           return ScaleTransition(
             scale: animation,
-            child: FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
+            child: FadeTransition(opacity: animation, child: child),
           );
         },
-        child: Icon(
-          selected ? activeIcon : icon,
-          key: ValueKey(selected),
-        ),
+        child: Icon(selected ? activeIcon : icon, key: ValueKey(selected)),
       ),
     );
   }
@@ -281,7 +242,6 @@ class _DashboardPageState extends State<DashboardPage>
       // ========================================================
       // APP BAR
       // ========================================================
-
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         centerTitle: true,
@@ -291,13 +251,25 @@ class _DashboardPageState extends State<DashboardPage>
           opacity: _appBarFade,
           child: SlideTransition(
             position: _appBarSlide,
-            child: const Text(
-              'CrabLens',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontSize: 20,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/icon/app_icon_cl.png',
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'CrabLens',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 24,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -305,17 +277,13 @@ class _DashboardPageState extends State<DashboardPage>
         // ======================================================
         // ABOUT BUTTON
         // ======================================================
-
         actions: [
           FadeTransition(
             opacity: _appBarFade,
             child: ScaleTransition(
               scale: _appBarFade,
               child: IconButton(
-                icon: const Icon(
-                  Icons.info_outline,
-                  color: Colors.white,
-                ),
+                icon: const Icon(Icons.info_outline, color: Colors.white),
                 tooltip: 'About CrabLens',
                 onPressed: _openAboutScreen,
               ),
@@ -327,7 +295,6 @@ class _DashboardPageState extends State<DashboardPage>
       // ========================================================
       // MAIN CONTENT
       // ========================================================
-
       body: ClipRect(
         child: FadeTransition(
           opacity: _pageFade,
@@ -341,45 +308,93 @@ class _DashboardPageState extends State<DashboardPage>
       // ========================================================
       // BOTTOM NAVIGATION
       // ========================================================
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // FOR BEST RESULTS TIP
+          if (_currentIndex == 0)
+            SafeArea(
+              bottom: false,
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1F1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFF5DEDE)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.lightbulb_outline,
+                      color: Color(0xFFB52B35),
+                      size: 34,
+                    ),
+                    const SizedBox(width: 14),
+                    Container(
+                      width: 1,
+                      height: 42,
+                      color: const Color(0xFFD9BDBD),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'For best results:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF292929),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Use a clear photo in good lighting.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF777777),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
-      bottomNavigationBar:
+          // ORIGINAL BOTTOM NAVIGATION — UNCHANGED
           BottomNavigationBar(
-        currentIndex: _currentIndex,
-
-        selectedItemColor:
-            AppColors.primary,
-
-        unselectedItemColor:
-            Colors.grey.shade500,
-
-        type:
-            BottomNavigationBarType.fixed,
-
-        onTap: _onTabChanged,
-
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildNavIcon(
-              icon:
-                  Icons.dashboard_outlined,
-              activeIcon:
-                  Icons.dashboard,
-              selected:
-                  _currentIndex == 0,
-            ),
-            label: 'Dashboard',
-          ),
-
-          BottomNavigationBarItem(
-            icon: _buildNavIcon(
-              icon:
-                  Icons.history_outlined,
-              activeIcon:
-                  Icons.history,
-              selected:
-                  _currentIndex == 1,
-            ),
-            label: 'History',
+            currentIndex: _currentIndex,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: Colors.grey.shade500,
+            type: BottomNavigationBarType.fixed,
+            onTap: _onTabChanged,
+            items: [
+              BottomNavigationBarItem(
+                icon: _buildNavIcon(
+                  icon: Icons.dashboard_outlined,
+                  activeIcon: Icons.dashboard,
+                  selected: _currentIndex == 0,
+                ),
+                label: 'Dashboard',
+              ),
+              BottomNavigationBarItem(
+                icon: _buildNavIcon(
+                  icon: Icons.history_outlined,
+                  activeIcon: Icons.history,
+                  selected: _currentIndex == 1,
+                ),
+                label: 'History',
+              ),
+            ],
           ),
         ],
       ),

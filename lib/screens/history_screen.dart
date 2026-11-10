@@ -11,12 +11,14 @@ class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  HistoryScreenState createState() => HistoryScreenState();
+  State<HistoryScreen> createState() => HistoryScreenState();
 }
 
 class HistoryScreenState extends State<HistoryScreen>
     with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _history = [];
+
+  String _selectedFilter = 'All';
 
   late final AnimationController _animationController;
 
@@ -24,12 +26,9 @@ class HistoryScreenState extends State<HistoryScreen>
   void initState() {
     super.initState();
 
-    // ==========================================
-    // HISTORY ENTRANCE ANIMATION
-    // ==========================================
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 900),
     );
 
     loadHistory();
@@ -41,14 +40,14 @@ class HistoryScreenState extends State<HistoryScreen>
     super.dispose();
   }
 
-  // ==========================================
+  // ============================================================
   // LOAD HISTORY
-  // ==========================================
+  // ============================================================
+
   Future<void> loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final List<String> historyStrings =
-        prefs.getStringList('scan_history') ?? [];
+    final historyStrings = prefs.getStringList('scan_history') ?? [];
 
     final List<Map<String, dynamic>> loadedHistory = [];
 
@@ -56,35 +55,342 @@ class HistoryScreenState extends State<HistoryScreen>
       try {
         final decoded = jsonDecode(item);
 
-        if (decoded is Map<String, dynamic>) {
-          loadedHistory.add(decoded);
+        if (decoded is Map) {
+          loadedHistory.add(Map<String, dynamic>.from(decoded));
         }
       } catch (e) {
         debugPrint('Invalid history item skipped: $e');
       }
     }
 
+    loadedHistory.sort((a, b) {
+      final dateA = _getDateTime(a);
+      final dateB = _getDateTime(b);
+
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1;
+      if (dateB == null) return -1;
+
+      return dateB.compareTo(dateA);
+    });
+
     if (!mounted) return;
 
     setState(() {
-      _history = loadedHistory.reversed.toList();
+      _history = loadedHistory;
     });
 
-    // Restart the entrance animation whenever history
-    // is refreshed from Dashboard or pull-to-refresh.
     _animationController
       ..reset()
       ..forward();
   }
 
-  // ==========================================
+  // ============================================================
+  // DELETE HISTORY ITEM
+  // ============================================================
+
+  Future<void> _deleteHistoryItem(Map<String, dynamic> item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete history?'),
+        content: Text(
+          'Remove ${_getCommonName(item)} from your scan history? '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList('scan_history') ?? [];
+      final target = jsonEncode(item);
+
+      // Remove only one matching entry, even when duplicates exist.
+      final index = saved.indexWhere((raw) {
+        try {
+          final decoded = jsonDecode(raw);
+          return decoded is Map &&
+              jsonEncode(Map<String, dynamic>.from(decoded)) == target;
+        } catch (_) {
+          return false;
+        }
+      });
+
+      if (index == -1) {
+        await loadHistory();
+        return;
+      }
+
+      saved.removeAt(index);
+      final success = await prefs.setStringList('scan_history', saved);
+      if (!success) throw Exception('Failed to save updated history');
+
+      if (!mounted) return;
+      await loadHistory();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('History item deleted')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to delete history: $e')),
+      );
+    }
+  }
+
+  // ============================================================
+  // DELETE ALL HISTORY
+  // ============================================================
+
+  Future<void> _deleteAllHistory() async {
+    if (_history.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete all history?'),
+        content: const Text(
+          'This will permanently remove all scan records from your history. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final success = await prefs.remove('scan_history');
+      if (!success) throw Exception('Failed to clear saved history');
+
+      if (!mounted) return;
+      setState(() {
+        _history.clear();
+      });
+      _animationController.reset();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All scan history deleted')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to delete all history: $e')),
+      );
+    }
+  }
+
+  // ============================================================
+  // DATE HELPERS
+  // ============================================================
+
+  DateTime? _getDateTime(Map<String, dynamic> item) {
+    final timestamp = item['timestamp'];
+
+    if (timestamp != null) {
+      final milliseconds = int.tryParse(timestamp.toString());
+
+      if (milliseconds != null) {
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+      }
+    }
+
+    final date = item['date']?.toString();
+
+    if (date != null && date.isNotEmpty) {
+      return DateTime.tryParse(date);
+    }
+
+    return null;
+  }
+
+  String _formatTime(Map<String, dynamic> item) {
+    final dateTime = _getDateTime(item);
+
+    if (dateTime == null) {
+      return item['time']?.toString() ?? '';
+    }
+
+    final hour = dateTime.hour % 12 == 0 ? 12 : dateTime.hour % 12;
+
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+
+    final period = dateTime.hour >= 12 ? 'PM' : 'AM';
+
+    return '$hour:$minute $period';
+  }
+
+  String _getDateGroup(Map<String, dynamic> item) {
+    final date = _getDateTime(item);
+
+    if (date == null) return 'Earlier';
+
+    final now = DateTime.now();
+
+    final today = DateTime(now.year, now.month, now.day);
+
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    final scanDate = DateTime(date.year, date.month, date.day);
+
+    if (scanDate == today) return 'Today';
+
+    if (scanDate == yesterday) return 'Yesterday';
+
+    return '${_monthName(date.month)} ${date.day}, ${date.year}';
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return months[month - 1];
+  }
+
+  // ============================================================
+  // STATUS BASED ON TOXIC CLASSIFICATION
+  // ============================================================
+
+  String _getStatus(Map<String, dynamic> item) {
+    // No crab detected.
+    if (item['isCrab'] == false) {
+      return 'No Crab';
+    }
+
+    // Toxic crab = Non-edible.
+    if (item['isToxic'] == true) {
+      return 'Non-edible';
+    }
+
+    // Non-toxic crab = Edible.
+    return 'Edible';
+  }
+
+  // ============================================================
+  // SPECIES INFORMATION
+  // ============================================================
+
+  String _getCommonName(Map<String, dynamic> item) {
+    if (_getStatus(item) == 'No Crab') {
+      return 'No crab detected';
+    }
+
+    final commonName = item['commonName']?.toString().trim() ?? '';
+    if (commonName.isNotEmpty) return commonName;
+
+    final species = item['species']?.toString().trim() ?? '';
+    if (species.isNotEmpty) return species;
+
+    return 'Unknown Species';
+  }
+
+  String _getScientificName(Map<String, dynamic> item) {
+    if (_getStatus(item) == 'No Crab') {
+      return 'Try a clearer photo';
+    }
+
+    return item['scientificName']?.toString() ??
+        item['scientific']?.toString() ??
+        '';
+  }
+
+  String _getConfidence(Map<String, dynamic> item) {
+    if (_getStatus(item) == 'No Crab') {
+      return '';
+    }
+
+    final confidence = item['confidence']?.toString() ?? '';
+
+    if (confidence.isEmpty || confidence == 'N/A') {
+      return '';
+    }
+
+    return confidence.contains('%') ? confidence : '$confidence%';
+  }
+
+  String _getImagePath(Map<String, dynamic> item) {
+    return item['imagePath']?.toString() ?? '';
+  }
+
+  // ============================================================
+  // FILTER HISTORY
+  // ============================================================
+
+  List<Map<String, dynamic>> get _filteredHistory {
+    if (_selectedFilter == 'All') {
+      return _history;
+    }
+
+    return _history.where((item) {
+      return _getStatus(item) == _selectedFilter;
+    }).toList();
+  }
+
+  // ============================================================
+  // GROUP HISTORY BY DATE
+  // ============================================================
+
+  Map<String, List<Map<String, dynamic>>> _groupHistory() {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (final item in _filteredHistory) {
+      final group = _getDateGroup(item);
+
+      grouped.putIfAbsent(group, () => []);
+      grouped[group]!.add(item);
+    }
+
+    return grouped;
+  }
+
+  // ============================================================
   // OPEN CRAB DETAIL
-  // ==========================================
-  void _openCrabDetail({
-    required String species,
-    required String imagePath,
-  }) {
-    if (imagePath.isEmpty) {
+  // ============================================================
+
+  void _openCrabDetail(Map<String, dynamic> item) {
+    if (_getStatus(item) == 'No Crab') return;
+
+    final imagePath = _getImagePath(item);
+
+    if (imagePath.isEmpty || !File(imagePath).existsSync()) {
       return;
     }
 
@@ -95,17 +401,12 @@ class HistoryScreenState extends State<HistoryScreen>
         reverseTransitionDuration: const Duration(milliseconds: 350),
         pageBuilder: (_, animation, secondaryAnimation) {
           return CrabDetailScreen(
-            speciesName: species,
+            speciesName: _getCommonName(item),
             imagePath: imagePath,
-            confidence: 'From History',
+            confidence: item['confidence']?.toString() ?? 'N/A',
           );
         },
-        transitionsBuilder: (
-          _,
-          animation,
-          secondaryAnimation,
-          child,
-        ) {
+        transitionsBuilder: (_, animation, secondaryAnimation, child) {
           final curvedAnimation = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
@@ -126,359 +427,279 @@ class HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  // ==========================================
-  // EMPTY HISTORY
-  // ==========================================
-  Widget _buildEmptyState() {
-    final animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    );
+  // ============================================================
+  // FILTER TABS
+  // ============================================================
 
-    return Center(
-      child: FadeTransition(
-        opacity: CurvedAnimation(
-          parent: _animationController,
-          curve: Curves.easeOut,
-        ),
-        child: ScaleTransition(
-          scale: Tween<double>(
-            begin: 0.75,
-            end: 1.0,
-          ).animate(animation),
-          child: Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 95,
-                  height: 95,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.history_rounded,
-                    size: 45,
-                    color: AppColors.primary.withValues(alpha: 0.65),
-                  ),
+  Widget _buildFilterTabs() {
+    const filters = ['All', 'Edible', 'Non-edible'];
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final filter = filters[index];
+          final isSelected = _selectedFilter == filter;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedFilter = filter;
+              });
+
+              _animationController
+                ..reset()
+                ..forward();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 9),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.black : Colors.transparent,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: isSelected ? Colors.black : Colors.grey.shade400,
+                  width: 1.2,
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'No history yet',
+              ),
+              child: Center(
+                child: Text(
+                  filter,
                   style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Your crab scans will appear here\n'
-                  'after you identify a crab.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: isSelected ? Colors.white : Colors.black87,
                     fontSize: 14,
-                    height: 1.5,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.camera_alt_outlined,
-                        size: 17,
-                        color: AppColors.primary,
-                      ),
-                      SizedBox(width: 7),
-                      Text(
-                        'Start scanning',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ============================================================
+  // DATE HEADER
+  // ============================================================
+
+  Widget _buildDateHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 22, bottom: 13, left: 3),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Colors.black87,
         ),
       ),
     );
   }
 
-  // ==========================================
-  // HISTORY CARD ANIMATION
-  // ==========================================
-  Widget _buildAnimatedCard({
-    required int index,
+  // ============================================================
+  // STATUS BADGE
+  // ============================================================
+
+  Widget _buildStatusBadge(String status) {
+    final Color color;
+    final Color background;
+
+    switch (status) {
+      case 'Edible':
+        color = Colors.green.shade800;
+        background = Colors.green.withValues(alpha: 0.12);
+        break;
+
+      case 'Non-edible':
+        color = Colors.red.shade800;
+        background = Colors.red.withValues(alpha: 0.12);
+        break;
+
+      default:
+        color = Colors.blueGrey.shade800;
+        background = Colors.blueGrey.withValues(alpha: 0.12);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Text(
+        status,
+        maxLines: 1,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // IMAGE PLACEHOLDER
+  // ============================================================
+
+  Widget _buildImagePlaceholder({required bool isNoCrab}) {
+    return Container(
+      width: 68,
+      height: 68,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Icon(
+        isNoCrab ? Icons.hide_image_outlined : Icons.image_outlined,
+        size: 27,
+        color: AppColors.primary.withValues(alpha: 0.75),
+      ),
+    );
+  }
+
+  // ============================================================
+  // HISTORY IMAGE
+  // ============================================================
+
+  Widget _buildHistoryImage(Map<String, dynamic> item) {
+    final imagePath = _getImagePath(item);
+    final isNoCrab = _getStatus(item) == 'No Crab';
+
+    if (imagePath.isEmpty || !File(imagePath).existsSync()) {
+      return _buildImagePlaceholder(isNoCrab: isNoCrab);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(13),
+      child: Image.file(
+        File(imagePath),
+        width: 68,
+        height: 68,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return _buildImagePlaceholder(isNoCrab: isNoCrab);
+        },
+      ),
+    );
+  }
+
+  // ============================================================
+  // HISTORY ITEM
+  // ============================================================
+
+  Widget _buildHistoryItem({
     required Map<String, dynamic> item,
+    required int index,
   }) {
-    final String species =
-        item['species']?.toString() ?? 'Unknown Species';
+    final status = _getStatus(item);
+    final commonName = _getCommonName(item);
+    final scientificName = _getScientificName(item);
+    final confidence = _getConfidence(item);
+    final time = _formatTime(item);
 
-    final String imagePath =
-        item['imagePath']?.toString() ?? '';
+    final isNoCrab = status == 'No Crab';
 
-    final String date =
-        item['date']?.toString() ?? '';
-
-    final bool isToxic =
-        item['isToxic'] == true;
-
-    // Stagger each card.
-    final double start =
-        (index * 0.08).clamp(0.0, 0.65);
-
-    final double end =
-        (start + 0.35).clamp(0.0, 1.0);
+    final start = (index * 0.08).clamp(0.0, 0.60);
+    final end = (start + 0.40).clamp(0.0, 1.0);
 
     final animation = CurvedAnimation(
       parent: _animationController,
-      curve: Interval(
-        start,
-        end,
-        curve: Curves.easeOutCubic,
-      ),
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
     );
 
     return FadeTransition(
       opacity: animation,
       child: SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0, 0.12),
+          begin: const Offset(0, 0.08),
           end: Offset.zero,
         ).animate(animation),
-        child: _HistoryCard(
-          species: species,
-          imagePath: imagePath,
-          date: date,
-          isToxic: isToxic,
-          onTap: () {
-            _openCrabDetail(
-              species: species,
-              imagePath: imagePath,
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_history.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: loadHistory,
-      child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          10,
-          14,
-          10,
-          20,
-        ),
-        itemCount: _history.length,
-        itemBuilder: (context, index) {
-          return _buildAnimatedCard(
-            index: index,
-            item: _history[index],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ============================================================
-// HISTORY CARD
-// ============================================================
-
-class _HistoryCard extends StatefulWidget {
-  final String species;
-  final String imagePath;
-  final String date;
-  final bool isToxic;
-  final VoidCallback onTap;
-
-  const _HistoryCard({
-    required this.species,
-    required this.imagePath,
-    required this.date,
-    required this.isToxic,
-    required this.onTap,
-  });
-
-  @override
-  State<_HistoryCard> createState() => _HistoryCardState();
-}
-
-class _HistoryCardState extends State<_HistoryCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pressController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-      lowerBound: 0.0,
-      upperBound: 0.025,
-    );
-  }
-
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
-
-  void _onTapDown(TapDownDetails details) {
-    _pressController.forward();
-  }
-
-  void _onTapUp(TapUpDetails details) {
-    _pressController.reverse();
-  }
-
-  void _onTapCancel() {
-    _pressController.reverse();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pressController,
-      builder: (context, child) {
-        final scale = 1.0 - _pressController.value;
-
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
-      },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: widget.onTap,
-          onTapDown: _onTapDown,
-          onTapUp: _onTapUp,
-          onTapCancel: _onTapCancel,
-          splashColor: AppColors.primary.withValues(alpha: 0.08),
-          highlightColor: AppColors.primary.withValues(alpha: 0.04),
+          onTap: isNoCrab ? null : () => _openCrabDetail(item),
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 5),
             child: Row(
               children: [
-                // ==========================================
-                // CRAB IMAGE
-                // ==========================================
-                Hero(
-                  tag: 'history_${widget.imagePath}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: widget.imagePath.isNotEmpty
-                        ? Image.file(
-                            File(widget.imagePath),
-                            width: 62,
-                            height: 62,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) {
-                              return _buildImagePlaceholder();
-                            },
-                          )
-                        : _buildImagePlaceholder(),
-                  ),
-                ),
+                _buildHistoryImage(item),
 
                 const SizedBox(width: 13),
 
-                // ==========================================
-                // SPECIES INFORMATION
-                // ==========================================
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.species,
+                        commonName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w700,
                           fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time_rounded,
-                            size: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              widget.date,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        scientificName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isNoCrab
+                              ? Colors.grey.shade600
+                              : Colors.black87,
+                          fontStyle: isNoCrab
+                              ? FontStyle.normal
+                              : FontStyle.italic,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        confidence.isNotEmpty ? '$time · $confidence' : time,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
-                // ==========================================
-                // STATUS
-                // ==========================================
-                _AnimatedStatusIcon(
-                  isToxic: widget.isToxic,
-                ),
-
-                const SizedBox(width: 4),
-
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.grey.shade400,
-                  size: 23,
+                // Stack the status badge and delete action vertically to
+                // prevent the Non-edible badge from being clipped on narrow screens.
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildStatusBadge(status),
+                    SizedBox(
+                      height: 36,
+                      width: 40,
+                      child: IconButton(
+                        tooltip: 'Delete history',
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        color: Colors.red.shade600,
+                        iconSize: 21,
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _deleteHistoryItem(item),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -488,85 +709,180 @@ class _HistoryCardState extends State<_HistoryCard>
     );
   }
 
-  Widget _buildImagePlaceholder() {
-    return Container(
-      width: 62,
-      height: 62,
-      color: Colors.grey.shade200,
-      child: const Icon(
-        Icons.image_not_supported_outlined,
-        color: Colors.grey,
-        size: 25,
+  // ============================================================
+  // EMPTY STATE
+  // ============================================================
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.history_rounded,
+                size: 42,
+                color: AppColors.primary.withValues(alpha: 0.7),
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            const Text(
+              'No history yet',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              'Your crab scans will appear here\n'
+              'after you classify a crab.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-// ============================================================
-// ANIMATED STATUS ICON
-// ============================================================
+  // ============================================================
+  // NO FILTER RESULTS
+  // ============================================================
 
-class _AnimatedStatusIcon extends StatefulWidget {
-  final bool isToxic;
+  Widget _buildNoResults() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.filter_list_off_rounded,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
 
-  const _AnimatedStatusIcon({
-    required this.isToxic,
-  });
+            const SizedBox(height: 12),
 
-  @override
-  State<_AnimatedStatusIcon> createState() =>
-      _AnimatedStatusIconState();
-}
-
-class _AnimatedStatusIconState
-    extends State<_AnimatedStatusIcon>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
+            Text(
+              'No ${_selectedFilter.toLowerCase()} scans found',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-
-    _controller.forward();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  // ============================================================
+  // MAIN HISTORY CONTENT
+  // ============================================================
+
+  Widget _buildHistoryContent() {
+    final groupedHistory = _groupHistory();
+
+    final groups = groupedHistory.entries.toList();
+
+    if (groups.isEmpty) {
+      return _history.isEmpty ? _buildEmptyState() : _buildNoResults();
+    }
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.fromLTRB(15, 12, 15, 25),
+      itemCount: groups.length,
+      itemBuilder: (context, groupIndex) {
+        final group = groups[groupIndex];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDateHeader(group.key),
+
+            ...List.generate(group.value.length, (index) {
+              final item = group.value[index];
+
+              return Column(
+                children: [
+                  _buildHistoryItem(item: item, index: index),
+
+                  if (index != group.value.length - 1)
+                    Divider(
+                      height: 1,
+                      thickness: 0.7,
+                      color: Colors.grey.withValues(alpha: 0.18),
+                      indent: 80,
+                    ),
+                ],
+              );
+            }),
+          ],
+        );
+      },
+    );
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: CurvedAnimation(
-        parent: _controller,
-        curve: Curves.elasticOut,
-      ),
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: widget.isToxic
-              ? AppColors.primary.withValues(alpha: 0.10)
-              : Colors.green.withValues(alpha: 0.10),
-          shape: BoxShape.circle,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _history.isEmpty ? null : _deleteAllHistory,
+                  icon: const Icon(Icons.delete_sweep_outlined, size: 19),
+                  label: const Text('Delete all'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red.shade700,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              _buildFilterTabs(),
+            ],
+          ),
         ),
-        child: Icon(
-          widget.isToxic
-              ? Icons.warning_amber_rounded
-              : Icons.check_circle,
-          color: widget.isToxic
-              ? AppColors.primary
-              : Colors.green,
-          size: 21,
+
+        Expanded(
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: loadHistory,
+            child: _buildHistoryContent(),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

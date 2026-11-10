@@ -233,7 +233,7 @@ class _SplashScreenState extends State<SplashScreen>
               FadeTransition(
                 opacity: _subtitleFade,
                 child: const Text(
-                  'AI-Powered Crab Identification',
+                  'Crab Species Classification',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey,

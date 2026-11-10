@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/data/crab_facts.dart';
@@ -14,6 +15,9 @@ import '../models/crab_info.dart';
 import '../services/tflite_service.dart';
 import '../utils/crab_classifier.dart';
 import 'crab_detail_screen.dart';
+import '../core/data/crab_database.dart';
+import 'crab_camera_screen.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final TFLiteService _tflite = TFLiteService();
+  final AudioPlayer _resultAudioPlayer = AudioPlayer();
 
   late String _currentFact;
 
@@ -64,6 +69,519 @@ class HomeScreenState extends State<HomeScreen>
   }
 
   // ============================================================
+  // REFRESH DID YOU KNOW
+  // ============================================================
+
+  void refreshDidYouKnow() {
+    if (!mounted || CrabFacts.facts.isEmpty) {
+      return;
+    }
+
+    final random = Random();
+
+    setState(() {
+      _currentFact = CrabFacts.facts[random.nextInt(CrabFacts.facts.length)];
+    });
+  }
+
+  Widget _buildCrabImage(
+    CrabInfo crab, {
+    required double width,
+    required double height,
+  }) {
+    final filename = crab.common
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+
+    final extensions = ['jpg', 'jpeg', 'png'];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: _buildImageWithFallback(filename, extensions, 0, width, height),
+    );
+  }
+
+  Widget _buildImageWithFallback(
+    String filename,
+    List<String> extensions,
+    int index,
+    double width,
+    double height,
+  ) {
+    if (index >= extensions.length) {
+      return Container(
+        width: width,
+        height: height,
+        color: Colors.grey.shade200,
+        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+      );
+    }
+
+    return Image.asset(
+      'assets/crabs/$filename.${extensions[index]}',
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return _buildImageWithFallback(
+          filename,
+          extensions,
+          index + 1,
+          width,
+          height,
+        );
+      },
+    );
+  }
+
+  Future<void> _playResultSound(bool isEdible) async {
+    try {
+      await _resultAudioPlayer.stop();
+
+      await _resultAudioPlayer.play(
+        AssetSource(isEdible ? 'sounds/check.mp3' : 'sounds/x.mp3'),
+      );
+    } catch (e) {
+      debugPrint('RESULT SOUND ERROR: $e');
+    }
+  }
+
+  Widget _buildCrabSummary() {
+    final crabs = CrabDatabase.getAllCrabs();
+
+    final edibleCrabs = crabs
+        .where(
+          (crab) =>
+              crab.edibility.toUpperCase().contains('SAFE') ||
+              crab.edibility.toUpperCase().contains('COMMERCIAL'),
+        )
+        .toList();
+
+    final nonEdibleCrabs = crabs
+        .where(
+          (crab) =>
+              crab.edibility.toUpperCase().contains('DANGEROUS') ||
+              crab.edibility.toUpperCase().contains('POISONOUS') ||
+              crab.edibility.toUpperCase().contains('TOXIC'),
+        )
+        .toList();
+
+    final toxicCrabs = nonEdibleCrabs;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Know your crabs',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => _showCrabListDialog(
+                    'Know your crabs',
+                    crabs,
+                    const Color(0xFF24594B),
+                    initialFilter: 'Edible',
+                  ),
+                  child: _summaryCard(
+                    edibleCrabs.length,
+                    'Edible',
+                    const Color(0xFFE8F0EF),
+                    const Color(0xFF24594B),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => _showCrabListDialog(
+                    'Know your crabs',
+                    crabs,
+                    const Color(0xFF24594B),
+                    initialFilter: 'Non-edible',
+                  ),
+                  child: _summaryCard(
+                    nonEdibleCrabs.length,
+                    'Non-edible',
+                    const Color(0xFFF4E8F0),
+                    const Color(0xFF873D66),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Know the toxic ones',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 145,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: toxicCrabs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final crab = toxicCrabs[index];
+
+              return SizedBox(
+                width: 112,
+                child: Column(
+                  children: [
+                    _buildCrabImage(crab, width: 100, height: 90),
+                    const SizedBox(height: 8),
+                    Text(
+                      crab.common,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Kapag hindi sigurado, huwag kainin.',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCrabListDialog(
+    String title,
+    List<CrabInfo> crabs,
+    Color accentColor, {
+    required String initialFilter,
+  }) {
+    String selectedFilter = initialFilter;
+
+    bool isEdible(CrabInfo crab) {
+      final value = crab.edibility.toUpperCase();
+      return value.contains('SAFE') || value.contains('COMMERCIAL');
+    }
+
+    bool isNonEdible(CrabInfo crab) {
+      final value = crab.edibility.toUpperCase();
+      return value.contains('DANGEROUS') ||
+          value.contains('POISONOUS') ||
+          value.contains('TOXIC');
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final filteredCrabs = crabs.where((crab) {
+            if (selectedFilter == 'Edible') return isEdible(crab);
+            if (selectedFilter == 'Non-edible') return isNonEdible(crab);
+            return true;
+          }).toList();
+
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: SizedBox(
+              height: MediaQuery.of(dialogContext).size.height * 0.72,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Know your crabs',
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Filter pills
+                    Wrap(
+                      spacing: 8,
+                      children: ['All', 'Edible', 'Non-edible'].map((filter) {
+                        final selected = selectedFilter == filter;
+
+                        return ChoiceChip(
+                          label: Text(filter),
+                          selected: selected,
+                          showCheckmark: false,
+                          selectedColor: const Color(0xFF17252A),
+                          backgroundColor: Colors.transparent,
+                          side: BorderSide(
+                            color: selected
+                                ? const Color(0xFF17252A)
+                                : Colors.grey.shade400,
+                          ),
+                          labelStyle: TextStyle(
+                            color: selected ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (_) {
+                            setDialogState(() {
+                              selectedFilter = filter;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Text(
+                      '${filteredCrabs.length} species',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Expanded(
+                      child: filteredCrabs.isEmpty
+                          ? const Center(child: Text('No species found.'))
+                          : ListView.separated(
+                              itemCount: filteredCrabs.length,
+                              separatorBuilder: (_, __) => Divider(
+                                height: 1,
+                                color: Colors.grey.shade200,
+                              ),
+                              itemBuilder: (context, index) {
+                                final crab = filteredCrabs[index];
+                                final edible = isEdible(crab);
+
+                                final badgeColor = edible
+                                    ? const Color(0xFFE5EFEB)
+                                    : const Color(0xFFF3E5EE);
+
+                                final badgeTextColor = edible
+                                    ? const Color(0xFF24594B)
+                                    : const Color(0xFF873D66);
+
+                                return InkWell(
+                                  onTap: () {
+                                    showDialog<void>(
+                                      context: dialogContext,
+                                      builder: (detailContext) => AlertDialog(
+                                        title: Text(crab.common),
+                                        content: SingleChildScrollView(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                crab.scientific,
+                                                style: const TextStyle(
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text('Local name: ${crab.local}'),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Edibility: ${crab.edibility}',
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(crab.description),
+                                              const SizedBox(height: 8),
+                                              Text('Habitat: ${crab.habitat}'),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Characteristics: ${crab.characteristics}',
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text('Risk: ${crab.risk}'),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Handling: ${crab.handling}',
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'First aid: ${crab.firstAid}',
+                                              ),
+                                              if (crab.seasonality != null &&
+                                                  crab.seasonality!
+                                                      .trim()
+                                                      .isNotEmpty) ...[
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  'Seasonality: ${crab.seasonality}',
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(detailContext),
+                                            child: const Text('Close'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 2,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        _buildCrabImage(
+                                          crab,
+                                          width: 58,
+                                          height: 58,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                crab.common,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                crab.scientific,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: badgeColor,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            edible ? 'Edible' : 'Non-edible',
+                                            style: TextStyle(
+                                              color: badgeTextColor,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _summaryCard(
+    int count,
+    String label,
+    Color background,
+    Color foreground,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: foreground,
+            ),
+          ),
+          Text(label, style: TextStyle(fontSize: 16, color: foreground)),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // ANIMATED SECTION
   // ============================================================
 
@@ -86,10 +604,7 @@ class HomeScreenState extends State<HomeScreen>
       end: Offset.zero,
     ).animate(fadeSlideAnimation);
 
-    final scaleAnimation = Tween<double>(
-      begin: 0.96,
-      end: 1.0,
-    ).animate(
+    final scaleAnimation = Tween<double>(begin: 0.96, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Interval(
@@ -114,7 +629,7 @@ class HomeScreenState extends State<HomeScreen>
   }
 
   // ============================================================
-  // LOAD AI MODEL
+  // LOAD MODEL
   // ============================================================
 
   Future<void> _loadModel() async {
@@ -129,7 +644,7 @@ class HomeScreenState extends State<HomeScreen>
       });
 
       debugPrint(
-        'CrabLens AI ready. '
+        'CrabLens model ready. '
         'Loaded ${_tflite.labels.length} labels.',
       );
     } catch (e) {
@@ -185,27 +700,76 @@ class HomeScreenState extends State<HomeScreen>
 
   Future<void> _saveToHistory(
     String path,
-    String species,
+    CrabInfo crabInfo,
     bool isToxic,
+    String confidence,
   ) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final List<String> history =
-        prefs.getStringList('scan_history') ?? [];
+    final List<String> history = prefs.getStringList('scan_history') ?? [];
 
-    history.add(
-      jsonEncode({
-        'species': species,
-        'imagePath': path,
-        'isToxic': isToxic,
-        'date':
-            '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-      }),
-    );
+    final record = {
+      'species': crabInfo.common,
+      'commonName': crabInfo.common,
+      'scientificName': crabInfo.scientific,
+      'imagePath': path,
+      'isCrab': true,
+      'isToxic': isToxic,
+      'confidence': confidence,
+      'date': DateTime.now().toIso8601String(),
+    };
 
-    await prefs.setStringList('scan_history', history);
+    history.add(jsonEncode(record));
+
+    final saved = await prefs.setStringList('scan_history', history);
+
+    debugPrint('History saved: $saved');
+    debugPrint('History record: ${jsonEncode(record)}');
 
     await loadRecentScans();
+  }
+  // ============================================================
+  // SHARE RESULT
+  // ============================================================
+
+  Future<void> _shareClassificationResult({
+    required String imagePath,
+    required String species,
+    required String scientificName,
+    required String confidence,
+    required String safety,
+  }) async {
+    try {
+      final XFile imageFile = XFile(imagePath);
+
+      final String shareText =
+          '''
+🦀 CrabLens Classification Result
+
+Species: $species
+Scientific Name: $scientificName
+Classification Confidence: $confidence
+Safety Classification: $safety
+
+Classified using CrabLens.
+
+Note: Classification confidence does not guarantee that the result is correct.
+''';
+
+      await SharePlus.instance.share(
+        ShareParams(
+          text: shareText,
+          files: [imageFile],
+          subject: 'CrabLens Classification Result – $species',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to share classification result: $e')),
+      );
+    }
   }
 
   // ============================================================
@@ -222,7 +786,6 @@ class HomeScreenState extends State<HomeScreen>
           // ======================================================
           // GREETING
           // ======================================================
-
           _animatedSection(
             start: 0.00,
             child: const Text(
@@ -240,14 +803,11 @@ class HomeScreenState extends State<HomeScreen>
           // ======================================================
           // SUBTITLE
           // ======================================================
-
           _animatedSection(
             start: 0.08,
             child: const Text(
-              'Identify crab species and check safety.',
-              style: TextStyle(
-                color: Colors.grey,
-              ),
+              'Classify crab species and check safety.',
+              style: TextStyle(color: Colors.grey),
             ),
           ),
 
@@ -256,18 +816,13 @@ class HomeScreenState extends State<HomeScreen>
           // ======================================================
           // DID YOU KNOW
           // ======================================================
-
-          _animatedSection(
-            start: 0.18,
-            child: _buildFactCard(),
-          ),
+          _animatedSection(start: 0.18, child: _buildFactCard()),
 
           const SizedBox(height: 28),
 
           // ======================================================
           // ACTION BUTTONS
           // ======================================================
-
           _animatedSection(
             start: 0.36,
             child: Row(
@@ -298,11 +853,10 @@ class HomeScreenState extends State<HomeScreen>
           // ======================================================
           // RECENT SCANS
           // ======================================================
-
-          _animatedSection(
-            start: 0.54,
-            child: _buildRecentScans(),
-          ),
+          // ======================================================
+          // KNOW YOUR CRABS
+          // ======================================================
+          _animatedSection(start: 0.54, child: _buildCrabSummary()),
         ],
       ),
     );
@@ -319,20 +873,14 @@ class HomeScreenState extends State<HomeScreen>
       decoration: BoxDecoration(
         color: AppColors.accentBlue.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: AppColors.accentBlue.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.accentBlue.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.lightbulb,
-                color: Colors.orange,
-                size: 24,
-              ),
+              Icon(Icons.lightbulb, color: Colors.orange, size: 24),
               SizedBox(width: 8),
               Text(
                 'Did you know?',
@@ -349,10 +897,7 @@ class HomeScreenState extends State<HomeScreen>
 
           Text(
             _currentFact,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
           ),
         ],
       ),
@@ -369,10 +914,7 @@ class HomeScreenState extends State<HomeScreen>
       children: [
         const Text(
           'Recent Scans',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
 
         const SizedBox(height: 15),
@@ -383,26 +925,21 @@ class HomeScreenState extends State<HomeScreen>
                   padding: EdgeInsets.symmetric(vertical: 20),
                   child: Text(
                     'No recent scans.',
-                    style: TextStyle(
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
               )
             : GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
                 itemCount: _recentImages.length,
                 itemBuilder: (context, index) {
-                  return _buildRecentImage(
-                    _recentImages[index],
-                  );
+                  return _buildRecentImage(_recentImages[index]);
                 },
               ),
       ],
@@ -419,11 +956,7 @@ class HomeScreenState extends State<HomeScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),
         ],
       ),
       child: ClipRRect(
@@ -433,10 +966,7 @@ class HomeScreenState extends State<HomeScreen>
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) {
             return const Center(
-              child: Icon(
-                Icons.broken_image,
-                color: Colors.grey,
-              ),
+              child: Icon(Icons.broken_image, color: Colors.grey),
             );
           },
         ),
@@ -463,7 +993,7 @@ class HomeScreenState extends State<HomeScreen>
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
-                      'Please wait while CrabLens AI is loading.',
+                      'Please wait while the classification model is loading.',
                     ),
                   ),
                 );
@@ -471,7 +1001,7 @@ class HomeScreenState extends State<HomeScreen>
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
-                      'AI model is unavailable. Please restart the app.',
+                      'Classification model is unavailable. Please restart the app.',
                     ),
                   ),
                 );
@@ -498,11 +1028,7 @@ class HomeScreenState extends State<HomeScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                color: AppColors.primary,
-                size: 32,
-              ),
+              Icon(icon, color: AppColors.primary, size: 32),
 
               const SizedBox(height: 5),
 
@@ -524,33 +1050,35 @@ class HomeScreenState extends State<HomeScreen>
   // IMAGE HANDLING
   // ============================================================
 
-  Future<void> _handleImage(
-    BuildContext context,
-    ImageSource source,
-  ) async {
+  Future<void> _handleImage(BuildContext context, ImageSource source) async {
     if (!_modelLoaded) {
       return;
     }
 
-    final picker = ImagePicker();
+    XFile? image;
 
-    final image = await picker.pickImage(
-      source: source,
-      maxWidth: 800,
-      imageQuality: 90,
-    );
+    if (source == ImageSource.camera) {
+      image = await Navigator.of(context).push<XFile>(
+        MaterialPageRoute(builder: (_) => const CrabCameraScreen()),
+      );
+    } else {
+      final picker = ImagePicker();
+
+      image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        imageQuality: 90,
+      );
+    }
 
     if (image == null) {
       return;
     }
+    final imagePath = image.path;
 
     if (!context.mounted) {
       return;
     }
-
-    // ==========================================================
-    // SHOW SCANNING UI
-    // ==========================================================
 
     showDialog(
       context: context,
@@ -558,130 +1086,118 @@ class HomeScreenState extends State<HomeScreen>
       barrierColor: Colors.black.withValues(alpha: 0.75),
       builder: (_) {
         return _ScanningDialog(
-          imagePath: image.path,
+          imagePath: imagePath,
           speciesCount: _tflite.labels.length,
         );
       },
     );
 
     try {
-      // ========================================================
-      // RUN TFLITE + MINIMUM SCAN DISPLAY TIME
-      // ========================================================
-
       final results = await Future.wait([
-        _tflite.classifyImage(image.path),
-        Future.delayed(
-          const Duration(milliseconds: 1600),
-        ),
+        _tflite.classifyImage(imagePath),
+        Future.delayed(const Duration(milliseconds: 1600)),
       ]);
 
       final result = results[0] as Map<String, dynamic>;
-
-      // ========================================================
-      // CLOSE SCANNER
-      // ========================================================
 
       if (context.mounted) {
         Navigator.of(context).pop();
       }
 
-      // ========================================================
-      // RESULT LABEL
-      // ========================================================
+      final String label = (result['label'] ?? 'Unknown').toString().trim();
 
-      final String label =
-          (result['label'] ?? 'Unknown').toString().trim();
+      final double confidence = result['confidence'] is num
+          ? (result['confidence'] as num).toDouble()
+          : double.tryParse(result['confidence'].toString()) ?? 0.0;
 
-      final double confidence =
-          double.tryParse(
-                result['confidence'].toString(),
-              ) ??
-              0.0;
-
+      debugPrint('========================================');
+      debugPrint('CRAB CLASSIFICATION RESULT');
+      debugPrint('Label: $label');
       debugPrint(
-        'TFLITE RESULT: $label | '
-        'Confidence: $confidence',
+        'Confidence: '
+        '${(confidence * 100).toStringAsFixed(2)}%',
       );
+      debugPrint('========================================');
 
-      // ========================================================
-      // FIND SPECIES
-      // ========================================================
+      // ============================================================
+      // MODEL RESULT
+      // ============================================================
 
-      final CrabInfo? crabInfo =
-          CrabClassifier.getCrabInfo(label);
+      final bool isNotACrab = CrabClassifier.isNotACrab(label);
 
-      // ========================================================
-      // LOW CONFIDENCE
-      // ========================================================
+      debugPrint('Is Not a Crab: $isNotACrab');
 
-      if (!CrabClassifier.isConfident(confidence)) {
+      // ============================================================
+      // NOT A CRAB
+      // ============================================================
+
+      if (isNotACrab) {
         if (!context.mounted) {
           return;
         }
 
-        _showLowConfidence(
-          context,
-          label,
-          confidence,
-        );
+        _showNotACrabResult(context, confidence);
 
         return;
       }
 
-      // ========================================================
-      // UNKNOWN
-      // ========================================================
+      // ============================================================
+      // GET CRAB SPECIES
+      // ============================================================
+
+      final CrabInfo? crabInfo = CrabClassifier.getCrabInfo(label);
 
       if (crabInfo == null) {
+        debugPrint('UNKNOWN MODEL LABEL: "$label"');
+
         if (!context.mounted) {
           return;
         }
 
-        _showUnknownResult(
-          context,
-          label,
-          confidence,
-        );
+        _showUnknownResult(context, label, confidence);
 
         return;
       }
 
-      debugPrint(
-        'MAPPED SPECIES: ${crabInfo.scientific}',
-      );
+      // ============================================================
+      // LOW CONFIDENCE
+      // ============================================================
 
-      // ========================================================
-      // SHOW REDESIGNED RESULT
-      // ========================================================
+      if (confidence < 0.70) {
+        debugPrint('LOW CONFIDENCE: ${(confidence * 100).toStringAsFixed(2)}%');
+
+        if (!context.mounted) {
+          return;
+        }
+
+        _showLowConfidence(context, label, confidence);
+
+        return;
+      }
+
+      // ============================================================
+      // VALID CRAB
+      // ============================================================
+
+      debugPrint('MAPPED SPECIES: ${crabInfo.scientific}');
 
       if (!context.mounted) {
         return;
       }
 
-      _showResult(
-        context,
-        image.path,
-        crabInfo,
-        confidence,
-      );
+      _showResult(context, image.path, crabInfo, confidence);
     } catch (e) {
       if (context.mounted) {
         Navigator.of(context).pop();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Unable to identify image: $e',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to classify image: $e')));
       }
 
       debugPrint('TFLITE ERROR: $e');
     }
   }
-
   // ============================================================
   // LOW CONFIDENCE
   // ============================================================
@@ -691,32 +1207,26 @@ class HomeScreenState extends State<HomeScreen>
     String label,
     double confidence,
   ) {
-    final percentage =
-        CrabClassifier.confidencePercentage(
-          confidence,
-        ).toStringAsFixed(1);
+    final percentage = CrabClassifier.confidencePercentage(
+      confidence,
+    ).toStringAsFixed(1);
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Row(
           children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.orange,
-            ),
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
             SizedBox(width: 8),
             Text('Low Confidence'),
           ],
         ),
         content: Text(
-          'The AI is not confident enough '
-          'about this identification.\n\n'
-          'Detected: $label\n'
-          'Confidence: $percentage%\n\n'
+          'The model is not confident enough '
+          'about this classification.\n\n'
+          // 'Classified: $label\n'
+          // 'Confidence: $percentage%\n\n'
           'Please take another clear photo '
           'with the crab fully visible.',
         ),
@@ -741,39 +1251,75 @@ class HomeScreenState extends State<HomeScreen>
     String label,
     double confidence,
   ) {
-    final percentage =
-        CrabClassifier.confidencePercentage(
-          confidence,
-        ).toStringAsFixed(1);
+    final percentage = CrabClassifier.confidencePercentage(
+      confidence,
+    ).toStringAsFixed(1);
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Row(
           children: [
-            Icon(
-              Icons.help_outline,
-              color: Colors.orange,
-            ),
+            Icon(Icons.help_outline, color: Colors.orange),
             SizedBox(width: 8),
             Text('Unknown Species'),
           ],
         ),
         content: Text(
-          'The AI detected "$label", '
-          'but this species is not available '
-          'in the CrabLens database.\n\n'
-          'Confidence: $percentage%',
+          'The image could not be confidently '
+          'classified as one of the supported '
+          'CrabLens species.\n\n'
+          'Confidence: $percentage%\n\n'
+          'Please try another clear photo with '
+          'the crab fully visible.',
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
             },
-            child: const Text('OK'),
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // NOT A CRAB RESULT
+  // ============================================================
+
+  void _showNotACrabResult(BuildContext context, double confidence) {
+    final percentage = CrabClassifier.confidencePercentage(
+      confidence,
+    ).toStringAsFixed(1);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.search_off_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('No Crab Detected'),
+          ],
+        ),
+        content: Text(
+          'The image does not appear to contain a crab.\n\n'
+          //'Classification confidence: $percentage%\n\n'
+          'Please take a clear photo of a crab '
+          'with the crab fully visible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Try Again'),
           ),
         ],
       ),
@@ -785,8 +1331,7 @@ class HomeScreenState extends State<HomeScreen>
   // ============================================================
 
   bool _isToxic(CrabInfo crabInfo) {
-    final edibility =
-        crabInfo.edibility.toUpperCase();
+    final edibility = crabInfo.edibility.toUpperCase();
 
     return edibility.contains('DANGEROUS') ||
         edibility.contains('POISONOUS') ||
@@ -799,8 +1344,7 @@ class HomeScreenState extends State<HomeScreen>
   // ============================================================
 
   bool _isEdible(CrabInfo crabInfo) {
-    final edibility =
-        crabInfo.edibility.toUpperCase();
+    final edibility = crabInfo.edibility.toUpperCase();
 
     return edibility.contains('SAFE') ||
         edibility.contains('EDIBLE') ||
@@ -821,23 +1365,14 @@ class HomeScreenState extends State<HomeScreen>
 
     final bool isEdible = _isEdible(crabInfo);
 
-    final double percentage =
-        CrabClassifier.confidencePercentage(
-          confidence,
-        );
+    final double percentage = CrabClassifier.confidencePercentage(confidence);
 
-    final String confidenceText =
-        percentage.toStringAsFixed(1);
+    final String confidenceText = percentage.toStringAsFixed(1);
 
     // ==========================================================
     // SAVE HISTORY
     // ==========================================================
-
-    _saveToHistory(
-      path,
-      crabInfo.scientific,
-      isToxic,
-    );
+    _saveToHistory(path, crabInfo, isToxic, '$confidenceText%');
 
     // ==========================================================
     // SAFETY HAPTIC WARNING
@@ -845,17 +1380,25 @@ class HomeScreenState extends State<HomeScreen>
 
     // Vibrate when the species is NOT edible.
     // Edible species remain silent.
-    if (!isEdible) {
+    // ==========================================================
+    // RESULT SOUND AND HAPTIC FEEDBACK
+    // ==========================================================
+
+    if (isEdible) {
+      // Positive classification
+      _playResultSound(true);
+      HapticFeedback.lightImpact();
+    } else {
+      // Non-edible classification warning
+      _playResultSound(false);
+
       HapticFeedback.heavyImpact();
 
-      Future.delayed(
-        const Duration(milliseconds: 350),
-        () {
-          if (context.mounted) {
-            HapticFeedback.heavyImpact();
-          }
-        },
-      );
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (context.mounted) {
+          HapticFeedback.heavyImpact();
+        }
+      });
     }
 
     // ==========================================================
@@ -873,6 +1416,7 @@ class HomeScreenState extends State<HomeScreen>
           confidence: percentage,
           isToxic: isToxic,
           isEdible: isEdible,
+
           onViewDetails: () {
             Navigator.of(context).pop();
 
@@ -887,17 +1431,25 @@ class HomeScreenState extends State<HomeScreen>
               ),
             );
           },
+
           onScanAnother: () {
             Navigator.of(context).pop();
 
             Future.microtask(() {
               if (context.mounted) {
-                _handleImage(
-                  context,
-                  ImageSource.camera,
-                );
+                _handleImage(context, ImageSource.camera);
               }
             });
+          },
+
+          onShare: () {
+            _shareClassificationResult(
+              imagePath: path,
+              species: crabInfo.common,
+              scientificName: crabInfo.scientific,
+              confidence: '$confidenceText%',
+              safety: crabInfo.edibility,
+            );
           },
         );
       },
@@ -912,6 +1464,7 @@ class HomeScreenState extends State<HomeScreen>
   void dispose() {
     _animationController.dispose();
     _tflite.dispose();
+    _resultAudioPlayer.dispose();
 
     super.dispose();
   }
@@ -930,6 +1483,7 @@ class _CrabResultDialog extends StatefulWidget {
 
   final VoidCallback onViewDetails;
   final VoidCallback onScanAnother;
+  final VoidCallback onShare;
 
   const _CrabResultDialog({
     required this.imagePath,
@@ -939,15 +1493,14 @@ class _CrabResultDialog extends StatefulWidget {
     required this.isEdible,
     required this.onViewDetails,
     required this.onScanAnother,
+    required this.onShare,
   });
 
   @override
-  State<_CrabResultDialog> createState() =>
-      _CrabResultDialogState();
+  State<_CrabResultDialog> createState() => _CrabResultDialogState();
 }
 
-class _CrabResultDialogState
-    extends State<_CrabResultDialog>
+class _CrabResultDialogState extends State<_CrabResultDialog>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
@@ -972,22 +1525,12 @@ class _CrabResultDialogState
     _scaleAnimation = Tween<double>(
       begin: 0.90,
       end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutBack,
-      ),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.06),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.forward();
   }
@@ -997,15 +1540,12 @@ class _CrabResultDialogState
     final Color accentColor = widget.isToxic
         ? Colors.red.shade700
         : widget.isEdible
-            ? Colors.green.shade600
-            : AppColors.primary;
+        ? Colors.green.shade600
+        : AppColors.primary;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 22,
-      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: SlideTransition(
@@ -1013,9 +1553,7 @@ class _CrabResultDialogState
           child: ScaleTransition(
             scale: _scaleAnimation,
             child: Container(
-              constraints: const BoxConstraints(
-                maxWidth: 430,
-              ),
+              constraints: const BoxConstraints(maxWidth: 430),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(28),
@@ -1036,12 +1574,7 @@ class _CrabResultDialogState
                       _buildImage(accentColor),
 
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          20,
-                          18,
-                          20,
-                          20,
-                        ),
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
                         child: Column(
                           children: [
                             _buildResultLabel(accentColor),
@@ -1086,54 +1619,40 @@ class _CrabResultDialogState
 
                             const SizedBox(height: 20),
 
-                            _buildConfidenceCard(
-                              accentColor,
-                            ),
+                            _buildConfidenceCard(accentColor),
 
                             const SizedBox(height: 14),
 
-                            _buildSafetyCard(
-                              accentColor,
-                            ),
+                            _buildSafetyCard(accentColor),
 
                             const SizedBox(height: 18),
 
+                            // ==================================================
+                            // VIEW SPECIES DETAILS
+                            // ==================================================
                             SizedBox(
                               width: double.infinity,
                               height: 52,
                               child: ElevatedButton(
-                                onPressed:
-                                    widget.onViewDetails,
+                                onPressed: widget.onViewDetails,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      accentColor,
-                                  foregroundColor:
-                                      Colors.white,
+                                  backgroundColor: accentColor,
+                                  foregroundColor: Colors.white,
                                   elevation: 0,
-                                  shape:
-                                      RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                      15,
-                                    ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
                                   ),
                                 ),
                                 child: const Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons
-                                          .menu_book_outlined,
-                                      size: 20,
-                                    ),
+                                    Icon(Icons.menu_book_outlined, size: 20),
                                     SizedBox(width: 8),
                                     Text(
                                       'View Species Details',
                                       style: TextStyle(
                                         fontSize: 15,
-                                        fontWeight:
-                                            FontWeight.bold,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ],
@@ -1141,41 +1660,65 @@ class _CrabResultDialogState
                               ),
                             ),
 
-                            const SizedBox(height: 9),
+                            // const SizedBox(height: 9),
 
+                            // // ==================================================
+                            // // SHARE RESULT
+                            // // ==================================================
+
+                            // SizedBox(
+                            //   width: double.infinity,
+                            //   height: 48,
+                            //   child: OutlinedButton.icon(
+                            //     onPressed: widget.onShare,
+                            //     style: OutlinedButton.styleFrom(
+                            //       foregroundColor: accentColor,
+                            //       side: BorderSide(
+                            //         color: accentColor.withValues(
+                            //           alpha: 0.45,
+                            //         ),
+                            //       ),
+                            //       shape: RoundedRectangleBorder(
+                            //         borderRadius: BorderRadius.circular(15),
+                            //       ),
+                            //     ),
+                            //     icon: const Icon(
+                            //       Icons.share_outlined,
+                            //       size: 19,
+                            //     ),
+                            //     label: const Text(
+                            //       'Share Result',
+                            //       style: TextStyle(
+                            //         fontWeight: FontWeight.w700,
+                            //       ),
+                            //     ),
+                            //   ),
+                            // ),
+                            const SizedBox(height: 5),
+
+                            // ==================================================
+                            // SCAN ANOTHER
+                            // ==================================================
                             SizedBox(
                               width: double.infinity,
                               height: 48,
                               child: TextButton(
-                                onPressed:
-                                    widget.onScanAnother,
-                                style:
-                                    TextButton.styleFrom(
-                                  foregroundColor:
-                                      accentColor,
-                                  shape:
-                                      RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                      15,
-                                    ),
+                                onPressed: widget.onScanAnother,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: accentColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
                                   ),
                                 ),
                                 child: const Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons
-                                          .camera_alt_outlined,
-                                      size: 19,
-                                    ),
+                                    Icon(Icons.camera_alt_outlined, size: 19),
                                     SizedBox(width: 7),
                                     Text(
                                       'Scan Another',
                                       style: TextStyle(
-                                        fontWeight:
-                                            FontWeight.w700,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
@@ -1250,11 +1793,7 @@ class _CrabResultDialogState
               },
               child: const Padding(
                 padding: EdgeInsets.all(8),
-                child: Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                child: Icon(Icons.close, color: Colors.white, size: 20),
               ),
             ),
           ),
@@ -1264,10 +1803,7 @@ class _CrabResultDialogState
           left: 15,
           bottom: 15,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 11,
-              vertical: 7,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(20),
@@ -1275,14 +1811,10 @@ class _CrabResultDialogState
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.auto_awesome,
-                  color: Colors.white,
-                  size: 14,
-                ),
+                Icon(Icons.auto_awesome, color: Colors.white, size: 14),
                 SizedBox(width: 5),
                 Text(
-                  'CrabLens AI',
+                  'CrabLens',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -1309,18 +1841,15 @@ class _CrabResultDialogState
       text = 'SAFETY WARNING';
       icon = Icons.warning_amber_rounded;
     } else if (widget.isEdible) {
-      text = 'IDENTIFICATION RESULT';
+      text = 'CLASSIFICATION RESULT';
       icon = Icons.check_circle_outline;
     } else {
-      text = 'IDENTIFICATION RESULT';
+      text = 'CLASSIFICATION RESULT';
       icon = Icons.verified_outlined;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: accentColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
@@ -1328,11 +1857,7 @@ class _CrabResultDialogState
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: accentColor,
-            size: 16,
-          ),
+          Icon(icon, color: accentColor, size: 16),
           const SizedBox(width: 6),
           Text(
             text,
@@ -1353,17 +1878,14 @@ class _CrabResultDialogState
   // ============================================================
 
   Widget _buildConfidenceCard(Color accentColor) {
-    final double value =
-        (widget.confidence / 100).clamp(0.0, 1.0);
+    final double value = (widget.confidence / 100).clamp(0.0, 1.0);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Row(
         children: [
@@ -1379,8 +1901,7 @@ class _CrabResultDialogState
                   child: CircularProgressIndicator(
                     value: value,
                     strokeWidth: 6,
-                    backgroundColor:
-                        Colors.grey.shade200,
+                    backgroundColor: Colors.grey.shade200,
                     color: accentColor,
                   ),
                 ),
@@ -1400,11 +1921,10 @@ class _CrabResultDialogState
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'AI Confidence',
+                  'Classification Confidence',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -1416,14 +1936,11 @@ class _CrabResultDialogState
 
                 Text(
                   widget.confidence >= 90
-                      ? 'Very confident identification'
+                      ? 'Very confident classification'
                       : widget.confidence >= 75
-                          ? 'Confident identification'
-                          : 'Moderate confidence',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                      ? 'Confident classification'
+                      : 'Moderate classification confidence',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -1445,13 +1962,10 @@ class _CrabResultDialogState
         decoration: BoxDecoration(
           color: Colors.red.shade50,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.red.shade200,
-          ),
+          border: Border.all(color: Colors.red.shade200),
         ),
         child: Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 42,
@@ -1471,8 +1985,7 @@ class _CrabResultDialogState
 
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'DO NOT CONSUME',
@@ -1489,7 +2002,7 @@ class _CrabResultDialogState
                   Text(
                     'This species may contain '
                     'dangerous toxins. Do not eat '
-                    'based solely on this identification.',
+                    'based solely on this classification.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
@@ -1511,13 +2024,10 @@ class _CrabResultDialogState
         decoration: BoxDecoration(
           color: Colors.green.shade50,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.green.shade200,
-          ),
+          border: Border.all(color: Colors.green.shade200),
         ),
         child: Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 42,
@@ -1537,8 +2047,7 @@ class _CrabResultDialogState
 
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'EDIBLE SPECIES',
@@ -1575,13 +2084,10 @@ class _CrabResultDialogState
       decoration: BoxDecoration(
         color: Colors.blueGrey.shade50,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.blueGrey.shade200,
-        ),
+        border: Border.all(color: Colors.blueGrey.shade200),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 42,
@@ -1601,11 +2107,10 @@ class _CrabResultDialogState
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'SPECIES IDENTIFIED',
+                  'SPECIES CLASSIFIED',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
@@ -1641,25 +2146,20 @@ class _CrabResultDialogState
 }
 
 // =================================================================
-// AI SCANNING DIALOG
+// SCANNING DIALOG
 // =================================================================
 
 class _ScanningDialog extends StatefulWidget {
   final String imagePath;
   final int speciesCount;
 
-  const _ScanningDialog({
-    required this.imagePath,
-    required this.speciesCount,
-  });
+  const _ScanningDialog({required this.imagePath, required this.speciesCount});
 
   @override
-  State<_ScanningDialog> createState() =>
-      _ScanningDialogState();
+  State<_ScanningDialog> createState() => _ScanningDialogState();
 }
 
-class _ScanningDialogState
-    extends State<_ScanningDialog>
+class _ScanningDialogState extends State<_ScanningDialog>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
@@ -1674,7 +2174,7 @@ class _ScanningDialogState
     'Analyzing image...',
     'Detecting crab features...',
     'Comparing species...',
-    'Identifying species...',
+    'Classifying species...',
   ];
 
   @override
@@ -1694,43 +2194,26 @@ class _ScanningDialogState
     _pulseAnimation = Tween<double>(
       begin: 0.94,
       end: 1.06,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _controller.repeat(reverse: true);
 
-    _statusTimer = Timer.periodic(
-      const Duration(milliseconds: 500),
-      (_) {
-        if (!mounted) return;
+    _statusTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted) return;
 
-        setState(() {
-          _statusIndex =
-              (_statusIndex + 1) % _statuses.length;
-        });
-      },
-    );
+      setState(() {
+        _statusIndex = (_statusIndex + 1) % _statuses.length;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 28,
-        vertical: 24,
-      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          18,
-          20,
-          18,
-          18,
-        ),
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
@@ -1746,8 +2229,7 @@ class _ScanningDialogState
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 AnimatedBuilder(
                   animation: _pulseAnimation,
@@ -1761,8 +2243,7 @@ class _ScanningDialogState
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: AppColors.primary
-                          .withValues(alpha: 0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1776,7 +2257,7 @@ class _ScanningDialogState
                 const SizedBox(width: 10),
 
                 const Text(
-                  'CrabLens AI',
+                  'CrabLens',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -1790,10 +2271,7 @@ class _ScanningDialogState
 
             Text(
               'Scanning your crab image',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
 
             const SizedBox(height: 18),
@@ -1801,8 +2279,7 @@ class _ScanningDialogState
             AspectRatio(
               aspectRatio: 1,
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(18),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -1821,10 +2298,7 @@ class _ScanningDialogState
                       },
                     ),
 
-                    Container(
-                      color: Colors.black
-                          .withValues(alpha: 0.12),
-                    ),
+                    Container(color: Colors.black.withValues(alpha: 0.12)),
 
                     AnimatedBuilder(
                       animation: _scanAnimation,
@@ -1832,26 +2306,20 @@ class _ScanningDialogState
                         return Align(
                           alignment: Alignment(
                             0,
-                            (_scanAnimation.value * 2) -
-                                1,
+                            (_scanAnimation.value * 2) - 1,
                           ),
                           child: child,
                         );
                       },
                       child: Container(
                         height: 3,
-                        margin:
-                            const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
-                          borderRadius:
-                              BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary
-                                  .withValues(alpha: 0.9),
+                              color: AppColors.primary.withValues(alpha: 0.9),
                               blurRadius: 14,
                               spreadRadius: 3,
                             ),
@@ -1861,9 +2329,7 @@ class _ScanningDialogState
                     ),
 
                     Positioned.fill(
-                      child: CustomPaint(
-                        painter: _ScanFramePainter(),
-                      ),
+                      child: CustomPaint(painter: _ScanFramePainter()),
                     ),
 
                     Center(
@@ -1871,8 +2337,7 @@ class _ScanningDialogState
                         animation: _pulseAnimation,
                         builder: (context, child) {
                           return Transform.scale(
-                            scale:
-                                _pulseAnimation.value,
+                            scale: _pulseAnimation.value,
                             child: child,
                           );
                         },
@@ -1881,12 +2346,12 @@ class _ScanningDialogState
                           height: 62,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white
-                                .withValues(alpha: 0.94),
+                            color: Colors.white.withValues(alpha: 0.94),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary
-                                    .withValues(alpha: 0.45),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.45,
+                                ),
                                 blurRadius: 18,
                                 spreadRadius: 3,
                               ),
@@ -1908,8 +2373,7 @@ class _ScanningDialogState
             const SizedBox(height: 18),
 
             AnimatedSwitcher(
-              duration:
-                  const Duration(milliseconds: 250),
+              duration: const Duration(milliseconds: 250),
               child: Text(
                 _statuses[_statusIndex],
                 key: ValueKey(_statusIndex),
@@ -1929,28 +2393,20 @@ class _ScanningDialogState
             const SizedBox(height: 12),
 
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 7,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
-                borderRadius:
-                    BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.memory,
-                    size: 14,
-                    color: Colors.grey.shade700,
-                  ),
+                  Icon(Icons.memory, size: 14, color: Colors.grey.shade700),
 
                   const SizedBox(width: 5),
 
                   Text(
-                    'TFLite AI • '
+                    'TFLite Model • '
                     '${widget.speciesCount} species',
                     style: TextStyle(
                       fontSize: 11,
@@ -1984,12 +2440,10 @@ class _ScanningDots extends StatefulWidget {
   const _ScanningDots();
 
   @override
-  State<_ScanningDots> createState() =>
-      _ScanningDotsState();
+  State<_ScanningDots> createState() => _ScanningDotsState();
 }
 
-class _ScanningDotsState
-    extends State<_ScanningDots>
+class _ScanningDotsState extends State<_ScanningDots>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
@@ -2011,48 +2465,33 @@ class _ScanningDotsState
       animation: _controller,
       builder: (context, child) {
         return Row(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
-          children: List.generate(
-            3,
-            (index) {
-              final double offset =
-                  index * 0.25;
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            final double offset = index * 0.25;
 
-              final double value =
-                  (_controller.value + offset) %
-                      1.0;
+            final double value = (_controller.value + offset) % 1.0;
 
-              double opacity;
+            double opacity;
 
-              if (value < 0.5) {
-                opacity =
-                    0.25 +
-                    (value * 2 * 0.75);
-              } else {
-                opacity =
-                    1.0 -
-                    ((value - 0.5) * 2 * 0.75);
-              }
+            if (value < 0.5) {
+              opacity = 0.25 + (value * 2 * 0.75);
+            } else {
+              opacity = 1.0 - ((value - 0.5) * 2 * 0.75);
+            }
 
-              return Opacity(
-                opacity: opacity,
-                child: Container(
-                  width: 7,
-                  height: 7,
-                  margin:
-                      const EdgeInsets.symmetric(
-                    horizontal: 3,
-                  ),
-                  decoration:
-                      const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary,
-                  ),
+            return Opacity(
+              opacity: opacity,
+              child: Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary,
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          }),
         );
       },
     );
@@ -2071,10 +2510,7 @@ class _ScanningDotsState
 
 class _ScanFramePainter extends CustomPainter {
   @override
-  void paint(
-    Canvas canvas,
-    Size size,
-  ) {
+  void paint(Canvas canvas, Size size) {
     const double margin = 9;
     const double cornerLength = 27;
     const double strokeWidth = 3;
@@ -2088,120 +2524,62 @@ class _ScanFramePainter extends CustomPainter {
     // TOP LEFT
 
     canvas.drawLine(
-      const Offset(
-        margin,
-        margin,
-      ),
-      const Offset(
-        margin + cornerLength,
-        margin,
-      ),
+      const Offset(margin, margin),
+      const Offset(margin + cornerLength, margin),
       paint,
     );
 
     canvas.drawLine(
-      const Offset(
-        margin,
-        margin,
-      ),
-      const Offset(
-        margin,
-        margin + cornerLength,
-      ),
+      const Offset(margin, margin),
+      const Offset(margin, margin + cornerLength),
       paint,
     );
 
     // TOP RIGHT
 
     canvas.drawLine(
-      Offset(
-        size.width -
-            margin -
-            cornerLength,
-        margin,
-      ),
-      Offset(
-        size.width - margin,
-        margin,
-      ),
+      Offset(size.width - margin - cornerLength, margin),
+      Offset(size.width - margin, margin),
       paint,
     );
 
     canvas.drawLine(
-      Offset(
-        size.width - margin,
-        margin,
-      ),
-      Offset(
-        size.width - margin,
-        margin + cornerLength,
-      ),
+      Offset(size.width - margin, margin),
+      Offset(size.width - margin, margin + cornerLength),
       paint,
     );
 
     // BOTTOM LEFT
 
     canvas.drawLine(
-      Offset(
-        margin,
-        size.height - margin,
-      ),
-      Offset(
-        margin + cornerLength,
-        size.height - margin,
-      ),
+      Offset(margin, size.height - margin),
+      Offset(margin + cornerLength, size.height - margin),
       paint,
     );
 
     canvas.drawLine(
-      Offset(
-        margin,
-        size.height -
-            margin -
-            cornerLength,
-      ),
-      Offset(
-        margin,
-        size.height - margin,
-      ),
+      Offset(margin, size.height - margin - cornerLength),
+      Offset(margin, size.height - margin),
       paint,
     );
 
     // BOTTOM RIGHT
 
     canvas.drawLine(
-      Offset(
-        size.width -
-            margin -
-            cornerLength,
-        size.height - margin,
-      ),
-      Offset(
-        size.width - margin,
-        size.height - margin,
-      ),
+      Offset(size.width - margin - cornerLength, size.height - margin),
+      Offset(size.width - margin, size.height - margin),
       paint,
     );
 
     canvas.drawLine(
-      Offset(
-        size.width - margin,
-        size.height -
-            margin -
-            cornerLength,
-      ),
-      Offset(
-        size.width - margin,
-        size.height - margin,
-      ),
+      Offset(size.width - margin, size.height - margin - cornerLength),
+      Offset(size.width - margin, size.height - margin),
       paint,
     );
   }
 
   @override
-  bool shouldRepaint(
-    covariant CustomPainter oldDelegate,
-  ) {
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return false;
   }
 }

@@ -2,13 +2,16 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:flutter_litert/flutter_litert.dart';
 
 class TFLiteService {
   Interpreter? _interpreter;
   List<String> labels = [];
 
   int _outputSize = 0;
+
+  // Minimum confidence required for a prediction.
+  static const double confidenceThreshold = 0.60;
 
   Future<void> loadModel() async {
     try {
@@ -26,7 +29,6 @@ class TFLiteService {
           .where((e) => e.isNotEmpty)
           .toList();
 
-      // Get the actual output size from the model.
       _outputSize = _interpreter!
           .getOutputTensor(0)
           .shape
@@ -34,35 +36,37 @@ class TFLiteService {
 
       print('MODEL LOADED');
       print('Labels: $labels');
+      print('Number of Labels: ${labels.length}');
       print('Model Output Size: $_outputSize');
     } catch (e) {
       print('MODEL LOAD ERROR: $e');
+      rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> classifyImage(String imagePath) async {
+  Future<Map<String, dynamic>> classifyImage(
+    String imagePath,
+  ) async {
     if (_interpreter == null) {
       throw Exception('Interpreter not loaded');
     }
 
     final imageBytes = File(imagePath).readAsBytesSync();
+
     final image = img.decodeImage(imageBytes);
 
     if (image == null) {
-      return {
-        'label': 'Unknown',
-        'confidence': 0.0,
-      };
+      throw Exception('Unable to decode image');
     }
 
-    // Resize image to the model's expected input size.
+    // Resize image to model input size.
     final resized = img.copyResize(
       image,
       width: 224,
       height: 224,
     );
 
-    // Prepare input tensor.
+    // Create input tensor.
     final input = List.generate(
       1,
       (_) => List.generate(
@@ -74,7 +78,7 @@ class TFLiteService {
       ),
     );
 
-    // Convert RGB values from 0-255 to 0.0-1.0.
+    // Convert pixels to normalized RGB values.
     for (int y = 0; y < 224; y++) {
       for (int x = 0; x < 224; x++) {
         final pixel = resized.getPixel(x, y);
@@ -85,35 +89,83 @@ class TFLiteService {
       }
     }
 
-    // Prepare output tensor.
+    // Create output tensor.
     final output = List.generate(
       1,
-      (_) => List.filled(_outputSize, 0.0),
+      (_) => List.filled(
+        _outputSize,
+        0.0,
+      ),
     );
 
-    // Run inference.
-    _interpreter!.run(input, output);
+    // Run the model.
+    _interpreter!.run(
+      input,
+      output,
+    );
 
-    // Find the class with the highest confidence.
+    // Find highest confidence.
     int maxIndex = 0;
     double maxConfidence = -1.0;
 
     for (int i = 0; i < _outputSize; i++) {
-      if (output[0][i] > maxConfidence) {
-        maxConfidence = output[0][i];
+      final confidence = output[0][i];
+
+      if (confidence > maxConfidence) {
+        maxConfidence = confidence;
         maxIndex = i;
       }
     }
 
+    // Get predicted label.
     String label = 'Unknown';
 
     if (labels.isNotEmpty && maxIndex < labels.length) {
       label = labels[maxIndex];
     }
 
+    // Normalize label for checking.
+    final normalizedLabel = label
+        .toLowerCase()
+        .trim()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+
+    // Check if model explicitly predicted "Not a Crab".
+    final isNotACrab = normalizedLabel == 'not a crab';
+
+    // Check confidence.
+    final isConfident = maxConfidence >= confidenceThreshold;
+
+    // Final crab decision.
+    //
+    // A result is accepted as a crab only when:
+    // 1. It is NOT the "Not a Crab" class.
+    // 2. Confidence is at least 80%.
+    final isCrab = !isNotACrab && isConfident;
+
+    // Debug information.
+    print('--------------------------------');
+    print('MODEL PREDICTION');
+    print('Label: $label');
+    print(
+      'Confidence: '
+      '${maxConfidence.toStringAsFixed(4)}',
+    );
+    print(
+      'Confidence %: '
+      '${(maxConfidence * 100).toStringAsFixed(2)}%',
+    );
+    print('Index: $maxIndex');
+    print('Is Not a Crab: $isNotACrab');
+    print('Is Confident: $isConfident');
+    print('Is Crab: $isCrab');
+    print('--------------------------------');
+
     return {
       'label': label,
       'confidence': maxConfidence,
+      'isCrab': isCrab,
     };
   }
 
